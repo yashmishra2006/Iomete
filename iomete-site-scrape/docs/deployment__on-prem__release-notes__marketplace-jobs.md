@@ -1,0 +1,459 @@
+<!-- source: https://iomete.com/resources/deployment/on-prem/release-notes/marketplace-jobs | scraped 2026-11-01 -->
+
+Page title: Marketplace Jobs | IOMETE
+URL: https://iomete.com/resources/deployment/on-prem/release-notes/marketplace-jobs
+Meta description: Release notes for IOMETE Marketplace Jobs. Learn about updates, improvements, and bug fixes for various data integration and processing jobs.
+
+---
+
+- Deployment
+- Release Notes
+- Marketplace Jobs
+
+On this page
+
+# Marketplace Jobs
+
+## Latest Versions
+
+| Name | Image | Version | Link
+
+| Data Compaction | iomete_data_compaction | 1.2.14 | Open ↗
+
+| File Streaming | iomete-file-streaming | 1.0.1 | Open ↗
+
+| Catalog Sync | iom-catalog-sync | 5.1.0 | Open ↗
+
+| MySQL Sync | iomete_mysql_sync | 3.0.0 | Open ↗
+
+| Kafka Iceberg Stream | kafka-iceberg-stream | 1.2.0 | Open ↗
+
+| Query Scheduler | spark-py | 3.5.7-v1 | Open ↗
+
+| TPC-DS Iceberg Generator | tpcds-iceberg-generator | 3.5.5 | Use job-templates in IOMETE
+
+| Lakehouse Backup | iomete-lakehouse-backup | 1.4.2 | Open ↗
+
+| Cleanup Untracked Table Folders | cleanup-untracked-table-folders | 0.1.5 | Open ↗
+
+## Recent Releases
+
+October 21, 2026
+
+## Catalog Sync Job - v5.1.0
+
+### 🐛 Bug Fixes
+
+- Catalog configuration in logs: Fixed the job writing a catalog's full configuration, including object-storage credentials such as fs.s3a.access.key and fs.s3a.secret.key, to the job logs when the catalog was excluded from indexing by name or by properties. The log message now contains only the catalog name. If you ran an earlier version with catalog exclusion rules, rotate the storage credentials of the excluded catalogs and remove old job logs.
+
+### ⚡ Improvements
+
+- Spark upgrade: The job image base moved from Spark 3.5.5 to Spark 3.5.7.
+
+October 16, 2026
+
+## Cleanup Untracked Table Folders Job - v0.1.5
+
+This release builds on v0.1.4 with the following changes.
+
+### 🚀 New Features
+
+- Report-only storage roots: When a database's tables are stored under more than one folder, the job now also lists those folders for review, including locations you approve in the new optional report_only_storage_roots setting. Nothing in a report-only root is ever deleted.
+- Protection for other databases and Iceberg write paths: Storage that belongs to another database visible in the catalog, and folders named by an Iceberg table's write.data.path, write.metadata.path, write.object-storage.path, or write.folder-storage.path, are never deletion candidates.
+
+### 🐛 Bug Fixes
+
+- Table metadata edge cases: Tables whose storage could be misread as absent, such as a table with a column named provider or location, a table with no location, or a table lookup that was denied, now block deletion for their database instead of leaving their folders unprotected.
+
+### ⚡ Improvements
+
+- Folder age: A folder's age is now the modification time of the newest object inside it. Folders whose age cannot be established are skipped.
+- Safer cleanup roots: Databases whose location is a bucket root, or equals or contains the catalog warehouse root, are no longer scanned and are reported as SKIPPED. Deletion is also blocked when no visible table is stored under the cleanup root.
+- Unresolved table ownership: More cases now block deletion with status_reason=unresolved_catalog_ownership, including Iceberg tables with gc.enabled set to anything but true, a custom write.location-provider.impl, or a write path without a scheme and bucket.
+- Deletion and audit failures: A deletion that fails partway is recorded as FAILED with status_reason=deletion_failed and lists only the folders that were actually deleted. If an audit row cannot be written, the job deletes nothing more in that run.
+- Cleanup report: The end-of-run report in the driver logs shows whether the run was a dry run, separates folders that belong to catalog tables from folders protected or skipped for other reasons, lists storage roots, and reports table locations outside the scanned root.
+- Size statistics: Object count and size are always collected for candidate folders. The collect_size_statistics setting is deprecated and ignored; no action is required, and it can be removed from your configuration.
+
+### ⚠️ Breaking Changes
+
+- Action required for exclude_paths: Every entry must be a full path with a scheme and bucket, such as s3a://bucket/data/analytics/manual_archive. A configuration with a path like /data/analytics/manual_archive now fails at startup. Such entries never matched a folder in earlier versions.
+- Unsupported storage: Databases stored on filesystems other than S3-compatible storage, Google Cloud Storage, or Azure storage, such as HDFS, are reported as SKIPPED with status_reason=invalid_storage_location.
+- Stricter deletion rules: Some databases that were cleaned by earlier versions may now be reported as SKIPPED or BLOCKED, for example a database whose location is the catalog warehouse root. Run in dry-run mode after upgrading and review the audit table before enabling deletion.
+
+September 25, 2026
+
+## Cleanup Untracked Table Folders Job - v0.1.4
+
+### 🐛 Bug Fixes
+
+- Catalog-scoped object storage access: Fixed a failure where the job used Spark's global Hadoop configuration for direct object-storage operations. When the selected catalog used a different S3-compatible endpoint than the platform storage, storage folder discovery could fail with a bucket-not-found error even though catalog discovery succeeded. The job now resolves the selected catalog's own storage settings and uses an isolated filesystem instance for discovery, size collection, and deletion.
+
+### ⚡ Improvements
+
+- Platform storage credentials are no longer inherited when accessing a catalog that declares its own endpoint
+- The job fails closed when a catalog's storage configuration cannot be resolved, instead of falling back to platform storage
+- New BLOCKED audit status for databases where a table's storage location cannot be read. Storage reconciliation still runs and reports what it found, but nothing is deleted (status_reason=unresolved_catalog_ownership)
+- New audit columns unresolved_table_count and potentially_untracked_folder_count. candidate_folder_count is now reserved for folders confirmed as eligible for deletion
+- Reworked end-of-run summary report in the driver logs, with separate sections for protected, excluded, untracked, and deleted folders
+
+September 22, 2026
+
+## Lakehouse Backup Job - v1.4.2
+
+### 🐛 Bug Fixes
+
+- Environment variable credentials: Fixed ${VAR_NAME} references in application.json being passed as literal values. The job now resolves them from Environment Variables at startup.
+
+September 18, 2026
+
+## Data Compaction Job - v1.2.14
+
+### ⚡ Improvements
+
+- Multi-cluster connectivity
+
+- Added support for the job to connect back to the platform when job is running in a separate data-plane cluster.
+- Needed for multi-cluster deployments. No impact on single-cluster deployments.
+
+September 18, 2026
+
+## Catalog Sync Job - v5.0.4
+
+### ⚡ Improvements
+
+- Multi-cluster connectivity
+
+- Added support for the job to connect back to the platform when job is running in a separate data-plane cluster.
+- Needed for multi-cluster deployments. No impact on single-cluster deployments.
+
+September 1, 2026
+
+## Lakehouse Backup Job - v1.4.1
+
+### 🐛 Bug Fixes
+
+- S3-to-S3 copy failures: Fixed intermittent NoSuchMethodError failures caused by conflicting AWS SDK libraries in the job image. Some executors loaded incompatible classes during the final S3 rename and repeatedly failed their copy tasks. The image now contains one AWS SDK library.
+
+August 19, 2026
+
+## Lakehouse Backup Job - v1.4.0
+
+### 🚀 New Features
+
+- Timestamped backup folders: Added copy.targetTimestampFolder to write backups to hourly, daily, weekly, or monthly UTC folders. Runs started in the same period reuse the folder, so retries can skip files already copied when copy.skipIdentical is enabled.
+
+August 18, 2026
+
+## Lakehouse Backup Job - v1.3.0
+
+### 🚀 New Features
+
+- Run history: Added Iceberg tables for run status, file and byte counts, failures, stage timings, executor timings, and the configuration used by each backup.
+
+### ⚡ Improvements
+
+- Job-wide bandwidth limit: Added copy.maxBandwidthMbPerSec to cap aggregate copy throughput across all executors.
+- Copy concurrency: Added vCPU-based copy slots with copy.slotsPerVcpu, allowing network-bound copies to use more concurrency without changing executor CPU requests.
+- Weighted task planning: Balanced tasks by file size and estimated per-file cost with copy.tasksPerSlot, copy.perFileOverheadBytes, and copy.maxBytesPerTask.
+- Performance testing: Added a load-testing runbook for comparing backup throughput with controlled datasets and configuration changes.
+
+### ⚠️ Breaking Changes
+
+- Legacy task-planning settings: copy.filesPerTask and copy.bytesPerTask are still accepted but no longer affect planning. Use copy.tasksPerSlot, copy.perFileOverheadBytes, and copy.maxBytesPerTask instead.
+
+August 6, 2026
+
+## Catalog Sync Job - v5.0.3
+
+### ⚡ Improvements
+
+- Iceberg metadata extraction: Added a direct Iceberg metadata path for Iceberg tables, avoiding the per-table Spark SQL metadata queries previously used during catalog sync.
+- Faster statistics collection: Current and historical table metrics are now read from Iceberg snapshot summaries instead of running multiple Spark SQL queries for each table.
+- Metadata parity: The optimized path preserves table schemas, comments, partition details, properties, and current and historical table metrics.
+
+August 4, 2026
+
+## Lakehouse Backup Job - v1.2.0
+
+### 🚀 New Features
+
+- Idempotent reruns: Added target-file checks that skip files with the same length and a sufficiently newer modification time. Set copy.skipIdentical to false to force a full copy.
+
+### ⚡ Improvements
+
+- Verified file publishing: Files are now written to a temporary target path, checked against the source length, and renamed into place only after verification succeeds.
+- Byte-balanced task planning: Replaced file-count partitioning with size-aware batches so large files start earlier and are distributed more evenly across the cluster.
+
+July 28, 2026
+
+## Lakehouse Backup Job - v1.1.0
+
+### 🚀 New Features
+
+- HDFS backup and restore: Added HDFS-compatible storage as both a source and a target, enabling copies between S3, Dell Isilon or OneFS, and Hadoop filesystems.
+- Empty-directory restore: Added recreation of empty directories when copying from an HDFS source.
+
+July 14, 2026
+
+## Lakehouse Backup Job - v1.0.0
+
+### 🚀 New Features
+
+- Initial release: Added recursive S3-to-S3 backups with independent source and target credentials, prefix preservation, parallel Spark execution, and per-file retries.
+- Failure reporting: Added run-level failure when any source file cannot be copied, preventing incomplete backups from being reported as successful.
+
+June 9, 2026
+
+## Cleanup Untracked Table Folders Job - v0.1.0
+
+### 🚀 New Features
+
+Added a new marketplace job for safely identifying and cleaning up untracked table folders in object storage.
+
+This first release introduces an on-demand cleanup workflow that compares catalog active table locations with physical storage folders before taking any destructive action.
+
+- Dry-run mode to review cleanup candidates before deletion
+- Active table protection based on catalog metadata
+- Exclusion rules for protected paths and database folders
+- Age filtering and candidate limits for safer cleanup
+- Controlled deletion with audit logging for each run
+
+April 29, 2026
+
+## Catalog Sync Job - v5.0.1
+
+### ⚡ Improvements
+
+This release focuses on improving catalog sync performance by reducing heavy Spark metadata queries and introducing parallelism for schema processing and indexing.
+
+What's New:
+
+- ✅ Optimized Iceberg table statistics extraction by querying snapshots once and deriving totals from snapshot summaries
+- ✅ Parallelized schema scraping and concurrent table/schema indexing HTTP calls for faster sync
+- ✅ Configurable parallelism via environment variables:
+
+- SCHEMA_PARALLELISM — controls the number of schemas processed in parallel (defaults to available CPU cores)
+- HTTP_PARALLELISM — controls the thread pool size for concurrent HTTP indexing calls (defaults to 16)
+
+Compatibility
+This version of the Catalog Sync Job is fully compatible with IOMETE Release 3.16.x.
+
+We recommend upgrading to this version when running IOMETE 3.16.x to ensure optimal performance and metadata consistency.
+
+May 7, 2026
+
+## Catalog Sync Job - v4.3.6
+
+### ⚡ Improvements
+
+This release improves catalog sync performance and adds better monitoring.
+
+- ✅ Faster table statistics collection with fewer Spark SQL queries
+- ✅ Skipped unnecessary queries for tables with no snapshots
+- ✅ Added failure-tracking metrics (table_process_failures, data_sync_failures) for better observability
+- ✅ Configurable parallelism via HTTP_PARALLELISM environment variable (defaults to available CPU cores, minimum 4)
+- ✅ Fixed inaccurate storage metrics where files referenced across multiple snapshots were counted repeatedly, inflating total size and file count
+
+March 6, 2026
+
+## Data Compaction Job - v1.2.13
+
+### 🐛 Bug Fixes
+
+- Rewrite data files sort-order SQL error: Fixed an issue where using strategy: sort with a sort_order config would fail with a missing STRING at ',' error.
+
+February 16, 2026
+
+## Catalog Sync Job - v5.0.0
+
+### ⚡ Improvements
+
+As part of IOMETE Release 3.16.x and our move toward a unified metadata collection experience, we have updated the Catalog Sync Job to ensure full compatibility with this release.
+What’s New:
+
+- ✅ Aligned with the unified metadata collection framework introduced in IOMETE 3.16.x
+- ✅ Improved consistency in metadata synchronization workflows
+
+Compatibility
+This version of the Catalog Sync Job is fully compatible with IOMETE Release 3.16.x.
+
+We recommend upgrading to this version when running IOMETE 3.16.x to ensure optimal performance and metadata consistency.
+
+January 7, 2026
+
+## Catalog Sync Job - v4.3.5
+
+### ⚡ Improvements
+
+Added new metrics to track Iceberg table and database sizes including all snapshots:
+
+Number of files for an Iceberg table including all snapshots (so showing true number of files for a table if they look into their storage)
+
+Total size of an Iceberg table including all snapshots
+
+Total DB/schema size including all snapshots
+
+These metrics are new columns in the existing tables in iomete_catalog_db:
+
+- table_metadata: total_table_nums_files, total_table_size_in_bytes
+- schema_metadata: total_db_size_in_bytes
+
+January 7, 2026
+
+## Useful SQL tools - v1.0.0
+
+### 🚀 New Features
+
+This is not a Docker image release, but rather a release of a set of useful SQL tools for managing and querying Iceberg tables in IOMETE. See sql scripts in the GitHub repository: iomete/iomete-marketplace-jobs/sql-tools
+
+Currently, these tools include:
+
+Creation of iomete_spark_audit_external_table to audit Spark jobs. From this table, one can query
+
+- run time (using eventTime column)
+- run date (using day column)
+- user (using user column)
+- job/query id (using eventId column)
+
+Creation of view for Daily jobs counts for a particular day of interest (day has to be hardcoded). This will create table stats for that day like below:
+
+Query that filters Spark jobs for multiple days. This query can last for some time depending on how much data accumulated on each day, and how many days is being queried:
+
+Query that helps track IOMete Database Objects Definitions (DDL) Change Tracking and Audit Capability
+
+November 3, 2025
+
+## Data Compaction Job - v1.2.12
+
+### 🚀 New Features
+
+- Implemented table-level locking system to prevent concurrent compaction operations on the same table
+- Config examples:
+
+```
+    lock {
+      enabled = true
+      ttl_seconds = 172800  # 48 hours (covers 1-day worst-case + buffer)
+    }
+
+```
+
+October 21, 2025
+
+## Data Compaction Job - v1.2.11
+
+### 🚀 New Features
+
+- Time-based Snapshot Expiration:
+
+Added support to remove Iceberg snapshots older than a set number of days using expire_snapshot.older_than_days.
+
+Works together with retain_last. If both are set, we keep snapshots that match either rule. We always keep at least 1 snapshot.
+
+Config examples:
+
+```
+// Remove snapshots older than 7 days (keep at least 1)
+expire_snapshot: { older_than_days: 7 }
+
+// Keep last 3 OR anything newer than 7 days (whichever is more)
+expire_snapshot: { retain_last: 3, older_than_days: 7 }
+
+// Table-specific override
+table_overrides: {
+  production.critical_table: {
+    expire_snapshot: { retain_last: 10, older_than_days: 30 }
+  }
+}
+
+```
+
+Retention rules:
+
+| Configuration | Behavior
+
+| None specified | Keeps 1 snapshot (default)
+
+| Only retain_last | Keeps the last N snapshots
+
+| Only older_than_days | Removes snapshots older than N days (minimum 1 snapshot always kept)
+
+| Both specified | Keeps snapshots matching EITHER condition (maximum retention)
+
+### ⚡ Improvements
+
+- Selective Operation Execution: Added support for fine-grained control over compaction operations through an enabled flag at both global and table-specific levels. You can now selectively enable or disable specific operations.
+
+### 🐛 Bug Fixes
+
+- Table Name Resolution:
+
+- Fixed an issue where table names provided without a database prefix (e.g., my_table instead of db.my_table) in table_include, table_exclude, or table_overrides would incorrectly run on the entire database.
+- The job now correctly resolves such tables using the databases parameter, ensuring targeted execution.
+
+- Rewrite Data Files with WHERE Filter:
+
+- Fixed an issue where the where filter failed due to incorrect string handling.
+- The job now correctly wraps SQL expressions, allowing compaction with both static and dynamic date filters.
+- Config examples:
+
+```
+  rewrite_data_files: {
+    // Static date filter
+    where: "date >= '2025-01-01'"
+
+    // Dynamic filters (recommended - no manual date updates needed)
+    // where: "date <= CURRENT_DATE - 30"                         // Data older than 30 days
+    // where: "event_time <= CURRENT_TIMESTAMP - INTERVAL 1 DAY"  // Data older than 1 day
+  }
+
+```
+
+Previous
+
+Spark
+
+Next
+
+Integrations
+
+## ON THIS PAGE
+
+- Latest Versions
+- Recent Releases
+- Catalog Sync Job
+
+- v5.1.0Oct 21, 2026
+- v5.0.4Sep 18, 2026
+- v5.0.3Aug 6, 2026
+- v5.0.1Apr 29, 2026
+- v4.3.6May 7, 2026
+- v5.0.0Feb 16, 2026
+- v4.3.5Jan 7, 2026
+
+- Cleanup Untracked Table Folders Job
+
+- v0.1.5Oct 16, 2026
+- v0.1.4Sep 25, 2026
+- v0.1.0Jun 9, 2026
+
+- Lakehouse Backup Job
+
+- v1.4.2Sep 22, 2026
+- v1.4.1Sep 1, 2026
+- v1.4.0Aug 19, 2026
+- v1.3.0Aug 18, 2026
+- v1.2.0Aug 4, 2026
+- v1.1.0Jul 28, 2026
+- v1.0.0Jul 14, 2026
+
+- Data Compaction Job
+
+- v1.2.14Sep 18, 2026
+- v1.2.13Mar 6, 2026
+- v1.2.12Nov 3, 2025
+- v1.2.11Oct 21, 2025
+
+- Useful SQL tools
+
+- v1.0.0Jan 7, 2026

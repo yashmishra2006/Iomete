@@ -1,0 +1,250 @@
+<!-- source: https://iomete.com/resources/deployment/life-cycle-management | scraped 2026-11-01 -->
+
+Page title: Life Cycle Management (LCM) | IOMETE
+URL: https://iomete.com/resources/deployment/life-cycle-management
+Meta description: Learn about IOMETE's comprehensive Life Cycle Management (LCM) for On-premise Kubernetes environment, from efficient installation to seamless upgrades and robust monitoring.
+
+---
+
+- Deployment
+- Advanced Settings
+- Life Cycle Management (LCM)
+
+On this page
+
+# Life Cycle Management (LCM)
+
+## Installation
+
+IOMETE is designed to operate within a Kubernetes environment. The installation process, streamlined through Helm, is well-organized, efficient, and straightforward.
+
+Prerequisites:
+
+- A pre-configured Kubernetes cluster.
+- Necessary credentials and access to external storage and database (a built-in database solution can also be used).
+
+Steps for Installation:
+
+- Repository Cloning: Clone the dedicated GitHub repository that contains the Helm charts and other essential files for deployment.
+- Helm Installation: Utilize the provided Helm charts from the repository to initiate the installation process.
+
+All required files, examples, and a comprehensive installation guide can be found in our GitHub repository. We highly recommend following the step-by-step guide provided in the repository and using the example configurations as templates.
+
+### Installation Example
+
+Here is an example for data plane installation. You'll only need to modify the values in the data-plane-values.yaml file and run the following command:
+
+```
+helm upgrade --install -n iomete iomete-dataplane iomete/iomete-dataplane \
+  -f data-plane-values.yaml --version 1.0.5
+
+```
+
+Below is an example of the data-plane-values.yaml file that the Helm chart uses to install the IOMETE data plane:
+
+data-plane-values.yaml
+
+```
+dataPlane:
+  adminUser:
+    username: "admin"
+    email: "admin@example.com" # required for password reset
+    firstName: Admin
+    lastName: Admin
+    temporaryPassword: "temp_password_here" # you will be prompted to change this on first login
+
+istioGateway:
+  # if you want to enable TLS, set the tlsCertSecretName
+  # name of the secret with certificates. Secret should contain 2 files: tls.crt and tls.key
+  # if redirectHttpToHttps is set to true, this secret must be provided to handle https traffic
+  tlsCertSecretName: ""
+
+spark:
+  logLevel: warn
+
+jupyter:
+  authToken: "********"
+
+keycloak:
+  adminUser: "kc_admin"
+  adminPassword: "********"
+  # if adminPasswordSecret is set, the password will be read from the secret
+  adminPasswordSecret: {}
+    # name: secret-name
+    # key: password
+
+storage:
+  lakehouse_bucket_name: "lakehouse"
+  assets_bucket_name: "assets"
+  settings:
+    type: "minio"
+    endpoint: "http://minio.default.svc.cluster.local:9000"
+    accessKey: "admin"
+    secretKey: "********"
+    # if secretKeySecret is set, the secretKey will be read from the secret
+    secretKeySecret: {}
+      # name: secret-name
+      # key: secretKey
+    additionalConfigOverrides: {}
+      # core-site-xml-overrides: |
+        # fs.s3a.path.style.access: true
+        # fs.s3a.connection.ssl.enabled: false
+
+database:
+  host: "mysql"
+  port: "3306"
+  user: "db_user"
+  password: "********"
+  # if passwordSecret is set, the password will be read from the secret
+  passwordSecret: {}
+    # name: byo-db-creds
+    # key: password
+  prefix: "iomete_" # all IOMETE databases should be prefixed with this. See database init script.
+
+clusterDomain: cluster.local
+
+ranger:
+  enabled: true
+
+```
+
+## Upgrades
+
+To ensure our customers benefit from the continuous improvements, feature additions, and optimizations we make, we release updates periodically. With every release, our primary focus remains the seamless transition of our users from one version to another, ensuring stability, data integrity, and operational continuity.
+
+### Semantic Versioning
+
+IOMETE follows the Semantic Versioning standard. This ensures that our customers can easily understand the impact of a new release and plan accordingly.
+
+- Major Version: A major version release indicates that the update contains significant changes. These changes can include new features, breaking changes, or other significant improvements.
+- Minor Version: A minor version release indicates that the update contains new features, improvements, and bug fixes. These changes are backward-compatible and do not require any significant changes to the existing setup.
+- Patch Version: A patch version release indicates that the update contains bug fixes and minor improvements. These changes are backward-compatible and do not require any significant changes to the existing setup.
+
+Each release is accompanied by a detailed changelog, which provides a comprehensive overview of the changes included in the update.
+
+### Upgrade Notification and Support
+
+Upon the release of a new update:
+
+- Notification: Customers will receive a notification regarding the new release. This will detail the new features, improvements, and any critical fixes included.
+- Upgrade Guide: Accompanying the notification, customers will be provided with a comprehensive upgrade guide. This manual will have step-by-step instructions, tailored to help users navigate through the upgrade process with ease.
+- Dedicated Support: Understanding that upgrades can sometimes be intricate, our support team is always ready to assist. Whether you need clarification on a step or face any technical challenges, our experts will be there to guide and ensure a successful upgrade.
+
+### Upgrade Process
+
+- Backup: Before starting the upgrade, take backups of configurations, databases, and any vital data. This precautionary step ensures data safety.
+- Access New Release: Fetch the updated Helm chart corresponding to the new release.
+- Apply the Upgrade: Use the Helm upgrade command with the fetched chart. Follow the instructions provided in the upgrade guide. Using Kubernetes replication and RollingUpdate strategies we ensure smooth transition of our services.
+- Validation: Post-upgrade, verify the platform's state. Check if all the services are running correctly and test key functionalities to ensure everything operates as expected.
+
+### Upgrade Example
+
+In most cases, just running the below command will be enough to upgrade the platform. Assuming data-plane-values.yaml is adjusted to the new version:
+
+important
+
+Replace --version 1.0.5 with the version you want to upgrade to
+
+```
+helm upgrade --install -n iomete iomete-dataplane iomete/iomete-dataplane \
+  -f data-plane-values.yaml --version 1.0.5
+
+```
+
+## Rollback Process
+
+While we strive to make every upgrade seamless, unforeseen issues can arise. In such scenarios, the platform is designed to support smooth rollbacks.
+
+- Rollback Guide: If the need arises, a rollback guide will be provided, detailing how to revert to the previous stable version without loss of data or functionality.
+- Rollback Execution: Use Helm's rollback command to revert to the previous state/version. Helm’s rollback feature ensures that the platform is restored to its previous operational state without hitches.
+- Support During Rollback: During a rollback, our support team remains available to address any challenges or concerns, ensuring that the system is restored to its optimal state without unnecessary downtime.
+
+### Rollback Example
+
+Again, in most cases, rollback is just running helm upgrade commands with the previous version. Assuming data-plane-values.yaml is adjusted to the previous version:
+
+tip
+
+It is recommended to keep a copy of the previous version of the file. Version control systems like Git can be used to track changes.
+
+```
+helm upgrade --install -n iomete iomete-dataplane iomete/iomete-dataplane \
+    -f data-plane-values.yaml --version 1.0.5
+
+```
+
+## Monitoring and Management
+
+Monitoring and management are pivotal to ensuring the health and performance. We've integrated leading monitoring tools such as Prometheus, Loki, and Grafana.
+
+Monitoring Features:
+
+- Prometheus: Collects metrics from configured targets at specified intervals, evaluates rule expressions, and can trigger alerts if certain conditions are observed.
+- Loki: A horizontally scalable, highly available, multi-tenant log aggregation system.
+- Grafana: Offers visualization panels to view metrics and logs.
+
+IOMETE provides built-in monitoring for Spark services
+
+Monitoring Kubernetes nodes through Grafana.
+
+## High Availability / Disaster Recovery
+
+1. External Dependencies and HA
+
+- MySQL Database:
+
+- Our platform integrates with a high-availability MySQL database setup. This ensures that database operations remain resilient to failures, guaranteeing uninterrupted data access.
+- Features like automated failover, replication, and backup capabilities of the MySQL setup mean that the platform can continue its operations even if a primary database node fails.
+
+- Storage Solution:
+
+- The platform is designed to work seamlessly with high-availability storage solutions. This guarantees that the data remains accessible and safe.
+- Through redundancy, data replication, and failover protocols present in these storage solutions, data loss or inaccessibility issues are effectively negated.
+
+2. Stateless Architecture
+
+One of the foundational strengths of our platform is its stateless nature:
+
+- Being stateless ensures that no session or user-specific data is stored on any single server or node. This means, in the event of a node failure, another node can easily take over without any loss of data or disruption to the user.
+- This architecture also aids in effortless horizontal scaling, as new nodes can be added without needing any unique configurations or data.
+
+3. Kubernetes-driven Replication and Failover
+
+Leveraging Kubernetes' powerful orchestration capabilities, our platform achieves enhanced availability:
+
+- Replication Across Nodes: Kubernetes ensures that the platform's services and pods are replicated across multiple nodes. If a node faces issues or goes down, traffic is automatically directed to healthy nodes, ensuring uninterrupted service.
+
+4. Disaster Recovery and Quick Switching
+
+In the improbable event of a complete Kubernetes cluster failure:
+
+- Customers have the option to maintain a separate standby Kubernetes cluster with our platform deployed.
+- This standby instance can be quickly pointed to the same high-availability database and storage. This ensures a swift switch without any data loss or significant downtime.
+
+Previous
+
+MySQL Deployment
+
+Next
+
+Custom Java Truststore
+
+## ON THIS PAGE
+
+- Installation
+
+- Installation Example
+
+- Upgrades
+
+- Semantic Versioning
+- Upgrade Notification and Support
+- Upgrade Process
+- Upgrade Example
+
+- Rollback Process
+
+- Rollback Example
+
+- Monitoring and Management
+- High Availability / Disaster Recovery

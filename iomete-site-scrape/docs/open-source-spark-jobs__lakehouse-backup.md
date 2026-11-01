@@ -1,0 +1,374 @@
+<!-- source: https://iomete.com/resources/open-source-spark-jobs/lakehouse-backup | scraped 2026-11-01 -->
+
+Page title: Lakehouse Backup Job | IOMETE
+URL: https://iomete.com/resources/open-source-spark-jobs/lakehouse-backup
+Meta description: Back up and restore lakehouse files between S3-compatible object stores and HDFS-compatible storage with a Spark job.
+
+---
+
+- Open Source Spark Jobs
+- Lakehouse Backup
+
+On this page
+
+# Lakehouse Backup Job
+
+The Lakehouse Backup Job copies all files and folders under a configured storage path between S3-compatible object stores and HDFS-compatible storage. It preserves relative paths and runs file copies in parallel across a Spark cluster, so you can use the same job for scheduled backups and restores.
+
+- Image: iomete.azurecr.io/iomete/iomete-lakehouse-backup:<VERSION>
+- Latest version: Marketplace Jobs release notes
+- Source: View on GitHub
+
+warning
+
+The job copies files as they exist during the run. It does not create a transactionally consistent snapshot while applications continue writing to the source. Run the backup when the source is not changing.
+
+## Supported Storage Paths
+
+You can configure either storage type as the source or target.
+
+| Source | Target | Typical use
+
+| S3 | S3 | Copy data to another bucket, account, region, or S3-compatible system.
+
+| S3 | HDFS | Back up object-store data to Dell Isilon, OneFS, or Hadoop storage.
+
+| HDFS | S3 | Restore or migrate HDFS data to object storage.
+
+| HDFS | HDFS | Copy data between HDFS-compatible systems.
+
+S3 support includes AWS S3 and compatible systems such as Dell ECS and Ceph. HDFS support uses simple authentication and works with systems such as Dell Isilon, OneFS, and Hadoop clusters.
+
+## Creating the Job Template
+
+Before you create the job, make sure the source credentials allow reads and the target credentials allow writes. For HDFS, the Spark driver and executors must be able to reach the NameNode and every DataNode.
+
+Open Job Templates and click New Job Template. See Creating a Spark Job for a walkthrough of the job form.
+
+Configure the application:
+
+| Field | Value
+
+| Docker image | iomete.azurecr.io/iomete/iomete-lakehouse-backup:<VERSION>
+
+| Main application file | spark-internal
+
+| Main class | com.iomete.backup.App
+
+| Arguments | /etc/configs/application.json
+
+Replace <VERSION> with the version listed in the Marketplace Jobs release notes.
+
+Choose an instance size for the amount of data you need to copy.
+
+Under Configurations → Config Maps, add a file with the path /etc/configs/application.json, then paste your configuration. See Config Maps for details.
+
+Add each credential as an environment variable whose name matches the ${VAR_NAME} value in the JSON. Set its value from an IOMETE Secret (recommended).
+
+Add a schedule if you want the backup to run automatically, then create the job.
+
+The selected instance normally supplies the executor count and CPU settings. If either value is missing, the run fails before copying data and reports the Spark setting you need to add: spark.kubernetes.executor.limit.cores and either spark.executor.instances or spark.dynamicAllocation.maxExecutors.
+
+## Configuring an S3-to-S3 Backup
+
+Use separate source and target credentials when the locations belong to different accounts or systems.
+
+```
+{
+  "source": {
+    "type": "s3",
+    "bucket": "<SOURCE_BUCKET>",
+    "prefix": "<SOURCE_PREFIX>",
+    "accessKey": "${SOURCE_ACCESS_KEY}",
+    "secretKey": "${SOURCE_SECRET_KEY}"
+  },
+  "target": {
+    "type": "s3",
+    "bucket": "<TARGET_BUCKET>",
+    "prefix": "<TARGET_PREFIX>",
+    "accessKey": "${TARGET_ACCESS_KEY}",
+    "secretKey": "${TARGET_SECRET_KEY}"
+  }
+}
+
+```
+
+Replace the bucket and prefix placeholders with your storage locations. The job copies every source file under SOURCE_PREFIX to the same relative path under TARGET_PREFIX.
+
+For a non-AWS S3-compatible system, add its endpoint and enable path-style access when the system requires it:
+
+```
+{
+  "type": "s3",
+  "bucket": "lakehouse-backup",
+  "prefix": "production",
+  "endpoint": "https://object-storage.example.com",
+  "pathStyleAccess": true,
+  "accessKey": "${S3_ACCESS_KEY}",
+  "secretKey": "${S3_SECRET_KEY}",
+  "region": "us-east-1"
+}
+
+```
+
+### S3 Configuration
+
+| Field | Required | Default | Description
+
+| type | Yes | — | Set to s3.
+
+| bucket | Yes | — | S3 bucket name.
+
+| prefix | No | Empty | Folder prefix under the bucket.
+
+| endpoint | No | AWS default | Endpoint for an S3-compatible system.
+
+| pathStyleAccess | No | false | Uses path-style bucket addressing when set to true.
+
+| accessKey | Yes | — | Access key, normally provided through an IOMETE Secret.
+
+| secretKey | Yes | — | Secret key, normally provided through an IOMETE Secret.
+
+| region | No | us-east-1 | S3 region.
+
+## Configuring HDFS Storage
+
+Use an HDFS block as either source or target. This example backs up S3 data to HDFS:
+
+```
+{
+  "source": {
+    "type": "s3",
+    "bucket": "<SOURCE_BUCKET>",
+    "prefix": "<SOURCE_PREFIX>",
+    "accessKey": "${SOURCE_ACCESS_KEY}",
+    "secretKey": "${SOURCE_SECRET_KEY}"
+  },
+  "target": {
+    "type": "hdfs",
+    "namenode": "isilon.example.com:8020",
+    "path": "backups/lakehouse",
+    "user": "iomete-backup"
+  }
+}
+
+```
+
+For Dell Isilon or OneFS, use the SmartConnect zone FQDN for namenode so connections can be balanced across nodes.
+
+| Field | Required | Default | Description
+
+| type | Yes | — | Set to hdfs.
+
+| namenode | Yes | — | NameNode RPC endpoint in host:port format.
+
+| path | No | Empty | Directory under the filesystem root.
+
+| user | Yes | — | HDFS user with the required read or write permissions.
+
+| authentication | No | simple | Authentication mode. Only simple is supported.
+
+Simple authentication uses the configured user name without a password. Kerberos-secured HDFS clusters are not supported.
+
+## Configuring Copy Behavior
+
+The default copy settings work for most backups. Add a copy block when you need timestamped backup folders, a full copy, a bandwidth limit, or different performance settings.
+
+```
+{
+  "copy": {
+    "skipIdentical": true,
+    "targetTimestampFolder": "daily",
+    "clockSkewToleranceMs": 30000,
+    "slotsPerVcpu": 4,
+    "tasksPerSlot": 20,
+    "perFileOverheadBytes": 26214400,
+    "maxBytesPerTask": 1073741824,
+    "maxBandwidthMbPerSec": 600
+  }
+}
+
+```
+
+| Field | Default | Description
+
+| skipIdentical | true | Skips a target file when its size matches and its modification time is sufficiently newer than the source. Set to false to copy every source file.
+
+| targetTimestampFolder | Unset | Adds an hourly, daily, weekly, or monthly UTC folder under the target path. Unset writes directly to the target path.
+
+| clockSkewToleranceMs | 30000 | Required target timestamp margin when deciding whether a file is identical.
+
+| slotsPerVcpu | 4 | Maximum concurrent file copies per executor vCPU.
+
+| tasksPerSlot | 20 | Target number of Spark tasks per copy slot.
+
+| perFileOverheadBytes | 26214400 | Estimated fixed per-file cost used to balance tasks. It does not add bytes to the copy.
+
+| maxBytesPerTask | 1073741824 | Maximum estimated work assigned to a normal task. A larger individual file remains whole in its own task.
+
+| maxBandwidthMbPerSec | Unset | Maximum aggregate copy rate across the whole job in MB/s. Unset means uncapped.
+
+The job does not split individual files. It stages each write under a temporary target path, verifies that the written length matches the source, and then renames the file into place. It retries temporary failures and fails the run if any file cannot be copied. Files that exist only at the target are not deleted.
+
+### Creating Timestamped Backup Folders
+
+By default, every run copies files to the target path in your configuration. Changed files replace their existing copies, while files deleted from the source remain at the target.
+
+Set targetTimestampFolder when you want a separate target folder for each hour, day, week, or month. This example creates one folder per day:
+
+```
+{
+  "copy": { "targetTimestampFolder": "daily" }
+}
+
+```
+
+If a run starts on February 14, 2026, the job appends 2026-02-14 to the configured target path. Folder names use the run start time in UTC:
+
+| Value | Folder example
+
+| hourly | 2026-02-14-09
+
+| daily | 2026-02-14
+
+| weekly | 2026-W07
+
+| monthly | 2026-02
+
+All runs that start in the same period use the same folder. For example, every daily run started on February 14 writes to 2026-02-14. When skipIdentical is enabled, later runs skip files that are already present and unchanged, then copy only new or changed files.
+
+note
+
+The job does not delete old timestamped folders or files that no longer exist at the source. Use a storage lifecycle rule or a separate cleanup job to remove them.
+
+## Recording Run History
+
+Run-history recording is enabled by default. The job creates these Iceberg tables on its first run:
+
+| Table | Contents
+
+| spark_catalog.iomete_system_db.lakehouse_backup_runs | One row per run with status, counts, byte totals, stage timings, and copy settings.
+
+| spark_catalog.iomete_system_db.lakehouse_backup_run_file_failures | One row per recorded file failure, joined by run_id.
+
+To disable recording, change its database, or limit recorded failure rows, add a stats block:
+
+```
+{
+  "stats": {
+    "enabled": true,
+    "database": "spark_catalog.iomete_system_db",
+    "maxFailureRows": 1000
+  }
+}
+
+```
+
+| Field | Default | Description
+
+| enabled | true | Records run history when enabled.
+
+| database | spark_catalog.iomete_system_db | Database for both history tables. You can include or omit the catalog.
+
+| maxFailureRows | 1000 | Maximum failure details stored for one run. The run table still records the full failure count.
+
+A history-table write failure produces a warning but does not turn a successful backup into a failed run.
+
+## Running and Checking a Backup
+
+- Confirm that applications are not changing the source files.
+- Open the job template and start a run.
+- Monitor the run as described in Running a Spark Job.
+- After it finishes, query the run-history table:
+
+```
+SELECT run_id,
+       status,
+       started_at,
+       ended_at,
+       files_copied,
+       files_skipped,
+       files_failed,
+       bytes_copied,
+       error_message
+FROM spark_catalog.iomete_system_db.lakehouse_backup_runs
+ORDER BY started_at DESC
+LIMIT 20;
+
+```
+
+A complete backup has status = 'SUCCEEDED', files_failed = 0, and a populated ended_at. A run that remains RUNNING long after it started usually means its driver stopped before recording the outcome.
+
+To inspect failed files, replace <RUN_ID> and run:
+
+```
+SELECT source_path, target_path, attempts_used, error
+FROM spark_catalog.iomete_system_db.lakehouse_backup_run_file_failures
+WHERE run_id = '<RUN_ID>'
+ORDER BY source_path;
+
+```
+
+## Restoring a Backup
+
+Create a separate job template for restores so a scheduled backup cannot accidentally run with reversed locations. Configure the backup location as source and the restore location as target, then run it while the restore target is not being written by another process.
+
+For example, restore an HDFS backup to S3 with:
+
+```
+{
+  "source": {
+    "type": "hdfs",
+    "namenode": "isilon.example.com:8020",
+    "path": "backups/lakehouse",
+    "user": "iomete-backup"
+  },
+  "target": {
+    "type": "s3",
+    "bucket": "<RESTORE_BUCKET>",
+    "prefix": "<RESTORE_PREFIX>",
+    "accessKey": "${RESTORE_ACCESS_KEY}",
+    "secretKey": "${RESTORE_SECRET_KEY}"
+  }
+}
+
+```
+
+After the run succeeds, validate the restored catalog or workload against the copied files before directing production traffic to it.
+
+## Tuning Copy Performance
+
+Start with the defaults and compare successful runs of the same source before changing anything. The run-history table separates source listing, target listing, planning, copy, and directory-creation time, and it records effective concurrency and task shape.
+
+- Raise slotsPerVcpu only when copy slots stay busy and additional concurrency continues to improve throughput.
+- Raise tasksPerSlot when too few tasks leave slots idle near the end of the copy.
+- Raise perFileOverheadBytes when tasks containing many small files run much longer than others.
+- Set maxBandwidthMbPerSec when the backup must leave network capacity for other workloads.
+
+For the full metrics reference and tuning queries, see Backup run history. To benchmark controlled configuration changes in your environment, follow the load-testing runbook.
+
+Previous
+
+Data Compaction
+
+Next
+
+Query Scheduler Job
+
+## ON THIS PAGE
+
+- Supported Storage Paths
+- Creating the Job Template
+- Configuring an S3-to-S3 Backup
+
+- S3 Configuration
+
+- Configuring HDFS Storage
+- Configuring Copy Behavior
+
+- Creating Timestamped Backup Folders
+
+- Recording Run History
+- Running and Checking a Backup
+- Restoring a Backup
+- Tuning Copy Performance

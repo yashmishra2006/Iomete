@@ -1,0 +1,100 @@
+<!-- source: https://iomete.com/resources/blog/iomete-core-components-technical-architecture | scraped 2026-11-01 -->
+
+Page title: IOMETE Core Components Technical Architecture | IOMETE
+URL: https://iomete.com/resources/blog/iomete-core-components-technical-architecture
+Meta description: IOMETE's architecture is built on four fundamental layers, each providing essential capabilities for enterprise data management
+
+---
+
+# IOMETE Core Components Technical Architecture
+
+February 17, 2025 · 6 min read
+
+Vusal Dadalov
+founder @IOMETE
+
+## IOMETE Core Components Technical Architecture
+
+IOMETE's architecture is built on four fundamental layers, each providing essential capabilities for enterprise data management. Let's examine each layer in detail.
+
+## Storage Layer
+
+The storage layer forms the foundation of IOMETE's architecture. It implements a multi-tier storage strategy that combines the cost-effectiveness of object storage with high-performance data access patterns.
+
+At its core, the storage layer uses object storage (such as MinIO for on-premises deployments or native cloud storage services) to provide the primary data repository. This is enhanced by Apache Iceberg, which provides ACID transactions, schema evolution, and time travel capabilities. The metadata store maintains table schemas, statistics, and optimization information, enabling efficient query planning and execution.
+
+The storage layer implements sophisticated data organization strategies, including data clustering, partitioning, and compaction. These capabilities ensure optimal performance while maintaining storage efficiency. The layer also handles data lifecycle management, automatically moving data between storage tiers based on access patterns and organizational policies.
+
+## Compute Layer
+
+IOMETE's compute layer provides the processing capabilities needed for diverse enterprise workloads. It consists of four main components:
+
+The Query Engine handles interactive queries, implementing sophisticated optimization techniques to ensure fast response times even at large scale. It includes a cost-based optimizer that considers data statistics, cluster resources, and workload patterns to generate efficient execution plans.
+
+The Batch ETL manages batch processing workloads, providing the scalability and reliability needed for large-scale data transformation tasks. It implements fault-tolerant execution, ensuring successful completion even in the presence of hardware or network failures.
+
+The Stream Processing component enables real-time data processing, supporting both event-time and processing-time semantics. It provides exactly-once processing guarantees and handles late-arriving data through sophisticated windowing mechanisms.
+
+The Machine Learning Engine supports the full lifecycle of machine learning workloads, from data preparation through model training and deployment. It integrates with popular ML frameworks while providing enterprise-grade security and governance.
+
+How IOMETE does this
+
+Spark, ETL, notebooks, SQL, catalog and RBAC in one self-hosted platform. Explore the platform→
+
+## Data Mesh Layer
+
+IOMETE implements a comprehensive data mesh architecture that enables organizational scaling of data initiatives. The data mesh layer provides the tools and capabilities needed to implement domain-oriented, distributed data ownership while maintaining global governance and interoperability.
+
+Domain Management supports the creation and management of data domains, allowing organizations to align data ownership with business domains. It provides the tools needed to define domain boundaries, responsibilities, and interfaces.
+
+The Data Products component implements the data-as-a-product paradigm, enabling domains to package and share their data in ways that are discoverable, trustworthy, and secure. It includes capabilities for versioning, quality management, and documentation.
+
+Data Contracts formalize the agreements between data producers and consumers, ensuring clear expectations and responsibilities. The contracts cover aspects such as data quality, availability, and service levels.
+
+The Self-Service Portal provides a unified interface for discovering, understanding, and accessing data products across domains. It implements sophisticated search and discovery mechanisms while enforcing organizational security policies.
+
+## Data Governance Layer
+
+The governance layer implements enterprise-grade controls while enabling efficient data utilization. It provides comprehensive capabilities for securing and managing data across the organization.
+
+Access Control implements fine-grained data security policies at multiple levels. It supports role-based access control (RBAC), attribute-based access control (ABAC), and row/column-level security. The system integrates with enterprise identity providers and implements sophisticated authentication and authorization mechanisms.
+
+The Data Catalog provides a unified view of all data assets across the organization. It maintains comprehensive metadata, including technical specifications, business context, and usage information. The catalog implements sophisticated search and discovery mechanisms while respecting security boundaries.
+
+Metadata Management oversees crucial operational aspects of data assets. It monitors table health, tracks performance metrics, and manages maintenance operations like compaction. The system provides comprehensive monitoring capabilities and automated management features to ensure optimal data platform performance and reliability.
+
+Audit Logging captures comprehensive information about system access and data usage. It provides the detailed audit trails needed for compliance and security monitoring, implementing secure logging mechanisms that prevent tampering with audit records.
+
+Through these core components, IOMETE provides a comprehensive platform for enterprise data management, combining advanced technical capabilities with the governance and security features that enterprises require.
+
+## Frequently Asked Questions
+
+### What is a storage layer in a data lakehouse architecture?
+
+The storage layer is the foundation that holds raw data on cost-effective object storage while a table format adds structure and reliability on top. It typically uses partitioning, clustering, and compaction to keep query performance high as data grows. IOMETE's storage layer combines object storage such as MinIO or native cloud storage with Apache Iceberg, which supplies ACID transactions, schema evolution, and time travel.
+
+### What is a compute layer and what workloads does it handle?
+
+A compute layer provides the processing engines that run queries and transformations against stored data, separate from where the data lives. It commonly covers interactive queries, batch ETL, stream processing, and machine learning so one platform serves diverse workloads. IOMETE's compute layer includes a cost-based query engine, fault-tolerant batch ETL, exactly-once stream processing, and a machine learning engine.
+
+### What is a data governance layer?
+
+A data governance layer enforces who can access data and tracks how it is used, combining access control, cataloging, metadata management, and audit logging. It lets organizations meet security and compliance requirements without blocking legitimate data use. IOMETE's governance layer supports role-based and attribute-based access control, row- and column-level security, a unified data catalog, and tamper-resistant audit logs.
+
+### How does a data mesh layer support distributed data ownership?
+
+A data mesh layer provides domain management, data products, data contracts, and a discovery portal so individual teams can own and share data under shared standards. This distributes responsibility to the domains closest to the data while preserving interoperability and governance. IOMETE includes these capabilities so domains can package data as discoverable, versioned products governed by contracts between producers and consumers.
+
+### Why is access control important in enterprise data platforms?
+
+Access control is critical because enterprise data often includes sensitive information that only certain roles should see, and weak controls create security and compliance risks. Fine-grained policies limit exposure while still letting users reach the data their work requires. IOMETE implements RBAC and ABAC along with row-level security and data masking, integrating with enterprise identity providers for consistent authentication.
+
+Last updated on Jun 3, 2026
+
+Newer post
+
+Reimagining Product Design with AI
+
+Older post
+
+IOMETE Deployment Models: On-Prem, Cloud, Hybrid, Air-Gap

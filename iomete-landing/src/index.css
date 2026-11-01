@@ -1,0 +1,168 @@
+@import "tailwindcss";
+
+/* Theme is switched with data-theme on <html> (system | light | dark resolved in hooks.js). */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* IOMETE brand tokens (from iomete.com's own stylesheet) mapped onto shadcn's variables.
+   Light: off-white paper, ink text, fluoro-lime primary, lake-blue ring. */
+:root {
+  --radius: 0.5rem;
+  --background: #fcfcf8;
+  --foreground: #202020;
+  --card: #ffffff;
+  --card-foreground: #202020;
+  --popover: #ffffff;
+  --popover-foreground: #202020;
+  --primary: #d3f52c;
+  --primary-foreground: #202020;
+  --secondary: #f2eeeb;
+  --secondary-foreground: #202020;
+  --muted: #f2eeeb;
+  --muted-foreground: #626261;
+  --accent: #f7ffcc;
+  --accent-foreground: #202020;
+  --destructive: #cf543c;
+  --border: #e6e6e2;
+  --input: #d0d0cd;
+  --ring: #8292e0;
+  --ink: #202020;
+  --ink-foreground: #fcfcf8;
+  --lime-text: #667302;
+  --ok: #617a61;
+  --ok-bg: #e8f7e8;
+  --warn: #d18538;
+  --warn-bg: #faf3e3;
+  --bad: #cf543c;
+  --bad-bg: #faf2f0;
+  --lake: #373a63;
+  --lake-bg: #e8f3fd;
+  /* Second colour: IOMETE's lake navy for bands and emphasis surfaces. */
+  --navy: #373a63;
+  --navy-foreground: #fcfcf8;
+  --band: #eef2f9;
+  --scale: 1;
+  color-scheme: light;
+}
+
+[data-theme="dark"] {
+  --background: #202020;
+  --foreground: #fcfcf8;
+  --card: #2a2a2a;
+  --card-foreground: #fcfcf8;
+  --popover: #2a2a2a;
+  --popover-foreground: #fcfcf8;
+  --primary: #d3f52c;
+  --primary-foreground: #202020;
+  --secondary: #303030;
+  --secondary-foreground: #fcfcf8;
+  --muted: #2a2a2a;
+  --muted-foreground: #babab7;
+  --accent: #353a1a;
+  --accent-foreground: #fcfcf8;
+  --destructive: #fa9884;
+  --border: #383838;
+  --input: #4c4c4c;
+  --ring: #8292e0;
+  --ink: #fcfcf8;
+  --ink-foreground: #202020;
+  --lime-text: #d3f52c;
+  --ok: #a0b8a0;
+  --ok-bg: #2d382d;
+  --warn: #f7c77e;
+  --warn-bg: #4a3418;
+  --bad: #fa9884;
+  --bad-bg: #4a2a22;
+  --lake: #8292e0;
+  --lake-bg: #2b2e4a;
+  --navy: #2b2e4a;
+  --navy-foreground: #fcfcf8;
+  --band: #25262c;
+  color-scheme: dark;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-ink: var(--ink);
+  --color-ink-foreground: var(--ink-foreground);
+  --color-lime-text: var(--lime-text);
+  --color-ok: var(--ok);
+  --color-ok-bg: var(--ok-bg);
+  --color-warn: var(--warn);
+  --color-warn-bg: var(--warn-bg);
+  --color-bad: var(--bad);
+  --color-bad-bg: var(--bad-bg);
+  --color-lake: var(--lake);
+  --color-lake-bg: var(--lake-bg);
+  --color-navy: var(--navy);
+  --color-navy-foreground: var(--navy-foreground);
+  --color-band: var(--band);
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "Inter", system-ui, sans-serif;
+  --font-heading: "Archivo", "Palatino Linotype", sans-serif;
+  --font-mono: "DM Mono", ui-monospace, monospace;
+}
+
+@layer base {
+  * { @apply border-border outline-ring/50; }
+  html { font-size: calc(100% * var(--scale)); scroll-behavior: smooth; scroll-padding-top: 7rem; }
+  body { @apply bg-background text-foreground font-sans antialiased overflow-x-hidden; }
+  h1, h2, h3 { @apply font-heading font-light tracking-tight text-balance; }
+}
+
+@layer components {
+  .eyebrow { @apply inline-flex items-center gap-2 font-mono text-[0.78rem] uppercase tracking-[0.08em] text-muted-foreground; }
+  .eyebrow::before { content: ""; @apply inline-block h-px w-6 bg-primary; }
+  .wrap { @apply mx-auto max-w-[77rem] px-4 sm:px-6 lg:px-8; }
+  .focusable { transition: opacity 600ms cubic-bezier(0.2, 0.7, 0.2, 1); }
+  body[data-focus="on"] .focusable:not(.in-focus) { opacity: 0.45; }
+  body[data-focus="on"] .focusable:not(.in-focus):hover,
+  body[data-focus="on"] .focusable:not(.in-focus):focus-within { opacity: 0.9; }
+  @media (max-width: 800px) { body[data-focus="on"] .focusable:not(.in-focus) { opacity: 0.75; } }
+}
+
+/* Diagram (HTML boxes; text sizes the box, so nothing overflows) */
+.dg-layer { transition: opacity 350ms; }
+.dg-layer[data-state="dim"] { opacity: 0.3; }
+.dg-box { @apply rounded-md border bg-secondary px-2.5 py-1.5 text-[0.78rem] leading-tight text-foreground transition-[border-color,box-shadow] duration-300; }
+.dg-layer[data-state="lit"] .dg-box { border-color: #c6e51c; box-shadow: 0 0 0 1px #c6e51c inset; }
+.dg-sub { @apply mt-0.5 block font-mono text-[0.62rem] tracking-[0.04em] text-muted-foreground; }
+.dg-lbl { @apply font-mono text-[0.62rem] tracking-[0.08em] uppercase text-muted-foreground; }
+.dg-flow { @apply mx-auto h-4 w-px bg-input; }
+.dg-flow[data-on="true"] { background: repeating-linear-gradient(to bottom, var(--lime-text) 0 4px, transparent 4px 7px); animation: dash 1.2s linear infinite; }
+@keyframes dash { to { background-position: 0 14px; } }
+
+/* Logo marquee */
+.marquee { mask-image: linear-gradient(to right, transparent, black 8%, black 92%, transparent); }
+.marquee-track { animation: marquee 48s linear infinite; }
+.marquee:hover .marquee-track, .marquee:focus-within .marquee-track { animation-play-state: paused; }
+@keyframes marquee { to { transform: translateX(-50%); } }
+
+/* Motion preferences */
+:root[data-motion="reduced"] *, :root[data-motion="reduced"] *::before, :root[data-motion="reduced"] *::after {
+  animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  :root:not([data-motion="full"]) *, :root:not([data-motion="full"]) *::before, :root:not([data-motion="full"]) *::after {
+    animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; scroll-behavior: auto !important;
+  }
+}

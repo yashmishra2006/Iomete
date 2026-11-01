@@ -1,0 +1,103 @@
+<!-- source: https://iomete.com/resources/glossary/archive | scraped 2026-11-01 -->
+
+Page title: Archive | IOMETE
+URL: https://iomete.com/resources/glossary/archive
+Meta description: Archive
+
+---
+
+### 2026
+
+- October 22 - Unified Data Warehouse
+- October 22 - Unified Data Analytics
+- October 22 - Unified Data Analytics Platform
+- October 22 - Tungsten Project for Apache Spark
+- October 22 - Tensorflow Estimator API
+- October 22 - TensorFlow
+- October 22 - Structured Streaming
+- October 22 - Streaming Analytics
+- October 22 - Star Schema
+- October 22 - Sparklyr
+- October 22 - Spark Tuning
+- October 22 - Sparse Tensor
+- October 22 - Spark Streaming
+- October 22 - Spark SQL
+- October 22 - SparkR
+- October 22 - Spark Elasticsearch
+- October 22 - Spark Applications
+- October 22 - Spark API
+- October 22 - Snowflake Schema
+- October 22 - Retrieval Augmented Generation
+- October 22 - Resilient Distributed Dataset (RDD)
+- October 22 - Real-Time Retail
+- October 22 - Real-Time Analytics
+- October 22 - PySpark
+- October 22 - PyCharm
+- October 22 - Predictive Maintenance
+- October 22 - Predictive Analytics
+- October 22 - Personalized Finance
+- October 22 - Parquet
+- October 22 - Pandas DataFrame
+- October 22 - Overall Equipment Effectiveness
+- October 22 - Orchestration
+- October 22 - Open Banking
+- October 22 - Neural Network
+- October 22 - Model Risk Management
+- October 22 - ML Pipelines
+- October 22 - MLOps (Machine Learning Operations)
+- October 22 - Medallion Architecture
+- October 22 - Materialized Views
+- October 22 - MapReduce
+- October 22 - Managed Spark
+- October 22 - Machine Learning Model
+- October 22 - Machine Learning Library (MLlib)
+- October 22 - Large Language Model Ops (LLMOps)
+- October 22 - Large Language Models (LLMs)
+- October 22 - Lambda Architecture
+- October 22 - Keras Model
+- October 22 - Jupyter Notebook
+- October 22 - Hosted Spark
+- October 22 - Hive Date Function
+- October 22 - HDFS
+- October 22 - Hash Buckets
+- October 22 - Hadoop Ecosystem
+- October 22 - Hadoop Cluster
+- October 22 - Feature Engineering
+- October 22 - Extract Transform Load (ETL)
+- October 22 - DNA Sequencing
+- October 22 - Digital Twin
+- October 22 - Dense Tensor
+- October 22 - Demand Forecasting
+- October 22 - Deep Learning
+- October 22 - Dataset
+- October 22 - DataFrame
+- October 22 - Data Warehouse
+- October 22 - Data Vault
+- October 22 - Data Transformation
+- October 22 - Data Sharing
+- October 22 - What is Data Security?
+- October 22 - Data Pipelines
+- October 22 - Data Mart
+- October 22 - Data Lakehouse
+- October 22 - Data Governance
+- October 22 - Data Automation
+- October 22 - Data Analysis Platform
+- October 22 - Convolutional Layer
+- October 22 - Continuous Applications
+- October 22 - Complex Event Processing (CEP)
+- October 22 - Catalyst Optimizer
+- October 22 - Bioinformatics
+- October 22 - Big Data Analytics
+- October 22 - Bayesian Neural Network (BNN)
+- October 22 - Automation Bias
+- October 22 - Artificial Neural Network (ANN)
+- October 22 - What Is Apache Spark?
+- October 22 - Apache Spark as a Service
+- October 22 - Apache Kylin
+- October 22 - Apache Kudu
+- October 22 - Apache Hive
+- October 22 - Apache Hadoop
+- October 22 - Anomaly Detection
+- October 22 - Alternative Data
+- October 22 - AdaGrad
+- October 22 - ACID Transactions

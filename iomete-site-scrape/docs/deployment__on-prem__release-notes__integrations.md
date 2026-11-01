@@ -1,0 +1,382 @@
+<!-- source: https://iomete.com/resources/deployment/on-prem/release-notes/integrations | scraped 2026-11-01 -->
+
+Page title: Integration Release Notes | IOMETE
+URL: https://iomete.com/resources/deployment/on-prem/release-notes/integrations
+Meta description: Release notes for IOMETE integrations, including dbt-iomete, the IOMETE Airflow Plugin, the IOMETE Tableau connector, the IOMETE Power BI connector, and the Arrow Flight SQL ODBC and JDBC drivers.
+
+---
+
+- Deployment
+- Release Notes
+- Integrations
+
+On this page
+
+# Integration Release Notes
+
+IOMETE integrations and drivers are released independently from the IOMETE platform. Check this page before upgrading one, especially if your environment pins package versions.
+
+## Latest Versions
+
+| Integration | Package | Version | Compatibility | Guide | Source
+
+| dbt | dbt-iomete | 1.8.3 | dbt Core 1.8.x; Python 3.9–3.12 | Open | GitHub
+
+| Airflow | iomete-airflow-plugin | 3.1.0 | Airflow >=2.10.5,<4.0.0; Python 3.10–3.13 | Open | GitHub
+
+| Tableau | tableau-connector | 0.1.0 | Tableau Desktop and Server 2024.2 and later | Open | GitHub
+
+| Power BI and Arrow Flight SQL ODBC | iomete-odbc-connector | 24.0.0-iomete.3 | Power BI Desktop and on-premises data gateway on Windows x64 | Open | Closed source
+
+| Arrow Flight SQL JDBC | flight-sql-jdbc-driver | 19.0.0-iomete.8 | Java 11 or later; Tableau Desktop and Server 2024.2 or later | Open | Closed source
+
+## Recent Releases
+
+October 20, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.8
+
+### 🐛 Bug Fixes
+
+- Decimal columns in CSV imports: Fixed setDouble on a DECIMAL parameter failing with "Binding value of type DOUBLE is not yet supported for expected Arrow type Decimal(38, 3, 128)". This affected tools that read a numeric column as a double, including DBeaver's CSV import, which could not write to any decimal column. The driver now converts double, float and whole-number values to the column's decimal type, rounding half up to its scale. setBigDecimal also accepts a value scaled differently from the column.
+
+October 19, 2026
+
+## Power BI Connector and ODBC Driver - v24.0.0-iomete.3
+
+### 🐛 Bug Fixes
+
+- Connecting to IOMETE 4.0 and later: Fixed DSN Test Connection, queries, and Power BI refreshes failing with "No client transport implementation for arrow-flight-reuse-connection" on IOMETE 4.0 and later, where Arrow Flight traffic goes through the Spark proxy server by default. The driver now reads results over the connection it already has open. If you turned off features.sparkProxyForArrowFlight to work around this error, you can turn it back on after upgrading. See Troubleshooting.
+
+October 3, 2026
+
+## Power BI Connector and ODBC Driver - v24.0.0-iomete.2
+
+### 🐛 Bug Fixes
+
+- On-premises data gateway: Fixed saving credentials for an IOMETE data source in the on-premises data gateway, which always failed with "3 arguments were passed to a function that expects 4". You can now refresh published reports through a gateway. Power BI Desktop was not affected. See Refreshing Through an On-premises Data Gateway.
+- Certificate Path: Made Certificate Path optional and fixed it being ignored. Leave it blank to trust the Windows certificate store, or enter the path to a PEM file to trust only the certificates in that file. Earlier versions always used the Windows certificate store. See Trusting the Server Certificate.
+
+### ⚠️ Breaking Changes
+
+- Saved credentials and gateway connections: Changed the connector's data source path. After upgrading, re-enter saved credentials in Power BI Desktop and recreate gateway connections. A Certificate Path set in a report must point to a readable PEM file on every machine that refreshes it, including every gateway node. See Upgrading From an Earlier Connector Version.
+
+October 6, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.7
+
+### 🐛 Bug Fixes
+
+- Empty string columns in BI Publisher: Added the defaultStringColumnLength connection property for tools that size string columns from JDBC metadata. Spark STRING columns have no declared length, so ResultSetMetaData reported a precision and display size of 0, and Oracle BI Publisher rendered those columns empty. Set defaultStringColumnLength to a positive integer to report that length for string columns the server sends without one. The property is opt-in, a length sent by the server always takes precedence, and DatabaseMetaData.getColumns is unchanged. See Default String Column Length.
+
+September 23, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.6
+
+### 🐛 Bug Fixes
+
+- Timestamps bound to DATE parameters: Fixed setTimestamp on a DATE parameter failing with "Binding value of type JAVA_SQL_TIMESTAMP is not yet supported for expected Arrow type Date(DAY)". This affected BI tools that send date-range report prompts as timestamps. The driver now binds java.sql.Timestamp and java.util.Date values to the calendar day they fall on, including dates before 1970.
+- Executing parameterized queries: Fixed parameterized prepared statements failing on execution when the server acknowledged the bound parameters without returning a statement handle. The driver now keeps using the original handle.
+- Date parameters on millisecond date columns: Fixed date parameters bound to Date(MILLISECOND) columns landing on the wrong date.
+- Parameter binding errors: Included the underlying conversion error as the cause when parameter binding fails, so the error shows why the value was rejected.
+
+September 17, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.5
+
+### 🐛 Bug Fixes
+
+- JDBC escape syntax: Fixed queries written in JDBC escape syntax failing with PARSE_SYNTAX_ERROR. This affected Oracle BI and other tools that rely on the driver to rewrite escape clauses. The driver now translates them before sending the query: {d '...'}, {t '...'}, and {ts '...'} become DATE, TIME, and TIMESTAMP literals, {escape '...'} becomes ESCAPE '...', {call ...} becomes CALL ..., and {fn ...} and {oj ...} are unwrapped. Escape-like text inside string literals and comments is left unchanged, and the driver sends any clause it does not recognize as written.
+- setEscapeProcessing on prepared statements: Fixed PreparedStatement.setEscapeProcessing throwing an unsupported-operation error. Escape translation is always on, so the driver accepts and ignores the call.
+
+September 14, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.4
+
+### 🐛 Bug Fixes
+
+- Pre-1970 timestamps: Corrected timestamps before 1970 that include a time-of-day component, preventing affected dates from being reported one day late.
+- Tableau timestamp precision: Added compatibilityMode=tableau, which reports zoned timestamp columns as JDBC TIMESTAMP metadata so Tableau preserves fractional seconds. Timestamp values and metadata for other clients remain unchanged.
+
+September 14, 2026
+
+## Tableau Connector - v0.1.0
+
+### 🚀 New Features
+
+- Tableau over Arrow Flight SQL: Added a signed .taco connector that adds an IOMETE (Arrow Flight SQL) dialog to Tableau Desktop and Server 2024.2 and later, on Windows, macOS, and Linux. See Tableau (Arrow Flight).
+- Spark-accurate calculations and filters: Tuned the connector's SQL dialect and capabilities for Spark, so CONTAINS handles search terms containing regular-expression characters, numeric casts of a date return Tableau's date numbering, and boolean fields group and filter without failing the query.
+- Certified against Tableau's test suite: The connector passes all 926 tests in Tableau's Datasource Verification Tool (TDVT) suite, run against a live IOMETE compute cluster.
+
+September 4, 2026
+
+## dbt-iomete - v1.8.3
+
+### 🚀 New Features
+
+- Loading duplicate unique keys: Added the delete+insert incremental strategy for runs that can return several rows with the same unique_key. It removes matching target rows, then inserts the complete result from the current run. The delete and insert are separate operations, so if the insert fails, rerun the model or perform a full refresh to restore the deleted rows.
+- Replacing Iceberg partitions: Added the insert_overwrite incremental strategy for runs that return the complete contents of the partitions they update. Only partitions present in the current result are replaced. Without partition_by, the strategy replaces the whole table in one atomic operation. See Incremental Models for configuration guidance.
+
+August 25, 2026
+
+## dbt-iomete - v1.8.2
+
+### ⚡ Improvements
+
+- Faster schema discovery: Changed table and view metadata reads to come directly from Spark, which avoids schema-service failures and improves discovery in schemas with many relations.
+- Separate metadata concurrency: Added list_relations_threads to control how many relations dbt inspects at once without increasing the threads used to build models. The default is 100; lower it if metadata discovery puts too much load on your data plane.
+- Configuration cleanup: Removed the IOMETE_DBT_SCHEMA_TIMEOUT_SECONDS setting. Delete it from your environment after upgrading.
+
+July 22, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.3
+
+### ⚡ Improvements
+
+- Catalog scoping for BI tools: Added opt-in catalog filtering for clients that use two-part table names. Set compatibilityMode=oracle or catalogFilterEnabled=true, then provide the catalog through schema.
+- Actionable query errors: Moved the server error, SQL statement, and compute cluster name into the top-level SQLException. Set enrichErrorMessages=false to retain the previous error format.
+
+### 🐛 Bug Fixes
+
+- Empty result metadata: Preserved column metadata when a query or metadata call returns no rows, so JDBC clients can still resolve columns by name.
+
+June 25, 2026
+
+## dbt-iomete - v1.8.1
+
+### 🐛 Bug Fixes
+
+- Metadata requests for large catalogs: Increased the schema-service timeout from 10 to 120 seconds to prevent timeouts while loading large catalogs. You could override it with IOMETE_DBT_SCHEMA_TIMEOUT_SECONDS; version 1.8.2 later removed the need for this setting.
+
+June 25, 2026
+
+## dbt-iomete - v1.8.0
+
+### ⚡ Improvements
+
+- dbt Core 1.8 support: Added compatibility with the dbt Core 1.8 release line.
+- Security update: Upgraded protobuf to 5.29.6 to address CVE-2026-0994.
+
+### ⚠️ Breaking Changes
+
+- Python 3.7 and 3.8 support removed: Removed support for Python 3.7 and 3.8. Upgrade to Python 3.9–3.12 before installing this version.
+
+June 22, 2026
+
+## IOMETE Airflow Plugin - v3.1.0
+
+### 🚀 New Features
+
+- Airflow 2 support: Added support for Airflow 2.10.5 alongside Airflow 3.x versions below 4.0.0.
+- Python 3.13 support: Extended the supported Python range to 3.10–3.13.
+
+### ⚡ Improvements
+
+- Airflow-version compatibility: Changed web component loading so the plugin registers them only when the installed Airflow version supports them.
+
+June 15, 2026
+
+## IOMETE Airflow Plugin - v3.0.1
+
+### ⚡ Improvements
+
+- Security update: Raised the requests floor to 2.33.0 so installations receive the patched dependency.
+
+June 5, 2026
+
+## Power BI Connector and ODBC Driver - v24.0.0-iomete.1
+
+### 🚀 New Features
+
+- Arrow Flight SQL ODBC driver on Apache Arrow 24.0.0: Released the IOMETE build of the Apache Arrow Flight SQL ODBC driver for Windows x64. The driver still registers as Arrow Flight Odbc IOMETE, so existing DSNs keep working after the upgrade.
+- Versioned Power BI connector: Released IOMETEConnector.mez together with the driver under the same version, both in iomete-odbc-connector.zip. The connector adds an IOMETE Arrow Flight Connector data source to Power BI Desktop with Import and DirectQuery support. See Power BI (Arrow Flight).
+- Signed bundle: Signed iomete-odbc-connector.zip with the IOMETE Enterprise GPG key. Verify it against iomete-odbc-connector.zip.asc with iomete_enterprise_public_key.asc.
+
+June 4, 2026
+
+## IOMETE Airflow Plugin - v3.0.0
+
+### 🚀 New Features
+
+- Multiple IOMETE environments: Added per-task host, domain, and token parameters to IometeOperator, so one Airflow instance can run jobs against different IOMETE environments.
+- Safer token lookup: Added access_token_variable, which resolves a token from an Airflow Variable only when the task runs. The token stays out of DAG code and Airflow's rendered template fields.
+
+### ⚠️ Breaking Changes
+
+- Task-level connection settings required: Removed support for global IOMETE Airflow Variables and variable_prefix. Pass host, domain, and either access_token or access_token_variable to each task. Follow Migrating from 2.x before upgrading.
+
+May 28, 2026
+
+## IOMETE Airflow Plugin - v2.0.2
+
+### ⚡ Improvements
+
+- Security updates: Added minimum patched versions for urllib3, idna, Mako, and python-multipart. Reinstall or upgrade the plugin to receive these dependency versions.
+
+May 28, 2026
+
+## IOMETE Airflow Plugin - v2.0.1
+
+### ⚡ Improvements
+
+- Airflow security updates: Raised the minimum Airflow version from 3.2.0 to 3.2.1 to include upstream security fixes.
+
+May 22, 2026
+
+## Arrow Flight SQL JDBC Driver - v17.0.0-iomete.1
+
+### 🚀 New Features
+
+- Java 8 compatibility: Added a Java 8 build with HTTP CONNECT proxy support, connection-level query timeouts, named parameters, and catalog selection through JDBC session options.
+
+May 14, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.2
+
+### 🚀 New Features
+
+- Connection-level query timeout: Added the queryTimeout connection property, which applies a default timeout to every statement on the connection.
+- Named parameters: Added :name parameters to prepared statements as an alternative to positional ? markers.
+
+May 14, 2026
+
+## Arrow Flight SQL JDBC Driver - v19.0.0-iomete.1
+
+### 🚀 New Features
+
+- HTTP CONNECT proxy support: Added automatic JVM proxy detection and connection-specific proxy settings for routing Arrow Flight traffic through enterprise HTTP proxies.
+
+February 25, 2026
+
+## IOMETE Airflow Plugin - v2.0.0
+
+### 🚀 New Features
+
+- Domain-aware connections: Added the IOMETE domain to each request, allowing jobs to run in the selected domain.
+
+### ⚡ Improvements
+
+- IOMETE SDK 3 support: Upgraded the plugin to IOMETE SDK 3.1 or later.
+- More reliable job startup: Added a short wait after submitting a job before requesting its status, reducing failures while the run is being created.
+
+### ⚠️ Breaking Changes
+
+- Updated runtime requirements: Raised the requirements to Python 3.10–3.12 and Airflow 3.1.6 or later.
+
+May 9, 2025
+
+## dbt-iomete - v1.7.9
+
+### 🚀 New Features
+
+- Setting Iceberg table properties: Added tblproperties to model configuration, applying table properties when dbt creates a relation.
+- Reducing merge scans: Added incremental_predicates to limit the target rows scanned during an incremental merge.
+
+### 🐛 Bug Fixes
+
+- Removing model columns: Fixed merge and append runs so they handle columns removed from a model.
+
+May 6, 2025
+
+## dbt-iomete - v1.7.8
+
+### 🐛 Bug Fixes
+
+- dbt-common compatibility: Fixed failures caused by the dbt-common package not being found.
+
+May 5, 2025
+
+## dbt-iomete - v1.7.7
+
+### 🚀 New Features
+
+- Composite unique keys: Added support for using several columns together as a unique_key in incremental models.
+
+### 🐛 Bug Fixes
+
+- Snapshots outside the default catalog: Fixed snapshots whose target is in another catalog.
+
+April 30, 2025
+
+## dbt-iomete - v1.7.6
+
+### 🐛 Bug Fixes
+
+- Synchronizing incremental schemas: Fixed incremental models using on_schema_change: sync_all_columns.
+
+March 10, 2025
+
+## dbt-iomete - v1.7.5
+
+### 🐛 Bug Fixes
+
+- Correct relation types: Fixed relation detection so views are identified as views instead of tables.
+- Accurate run results: Fixed run reporting so a failed model is no longer reported as successful.
+
+January 22, 2025
+
+## dbt-iomete - v1.7.4
+
+### 🚀 New Features
+
+- Domains and multiple catalogs: Added support for connecting a dbt project to an IOMETE domain and creating models outside the default catalog.
+
+### 🐛 Bug Fixes
+
+- Creating incremental tables: Fixed the first run of a new incremental model.
+
+Previous
+
+Marketplace Jobs
+
+Next
+
+Apache Ozone Deployment
+
+## ON THIS PAGE
+
+- Latest Versions
+- Recent Releases
+- Arrow Flight SQL JDBC Driver
+
+- v19.0.0-iomete.8Oct 20, 2026
+- v19.0.0-iomete.7Oct 6, 2026
+- v19.0.0-iomete.6Sep 23, 2026
+- v19.0.0-iomete.5Sep 17, 2026
+- v19.0.0-iomete.4Sep 14, 2026
+- v19.0.0-iomete.3Jul 22, 2026
+- v17.0.0-iomete.1May 22, 2026
+- v19.0.0-iomete.2May 14, 2026
+- v19.0.0-iomete.1May 14, 2026
+
+- Power BI Connector and ODBC Driver
+
+- v24.0.0-iomete.3Oct 19, 2026
+- v24.0.0-iomete.2Oct 3, 2026
+- v24.0.0-iomete.1Jun 5, 2026
+
+- Tableau Connector
+
+- v0.1.0Sep 14, 2026
+
+- dbt-iomete
+
+- v1.8.3Sep 4, 2026
+- v1.8.2Aug 25, 2026
+- v1.8.1Jun 25, 2026
+- v1.8.0Jun 25, 2026
+- v1.7.9May 9, 2025
+- v1.7.8May 6, 2025
+- v1.7.7May 5, 2025
+- v1.7.6Apr 30, 2025
+- v1.7.5Mar 10, 2025
+- v1.7.4Jan 22, 2025
+
+- IOMETE Airflow Plugin
+
+- v3.1.0Jun 22, 2026
+- v3.0.1Jun 15, 2026
+- v3.0.0Jun 4, 2026
+- v2.0.2May 28, 2026
+- v2.0.1May 28, 2026
+- v2.0.0Feb 25, 2026

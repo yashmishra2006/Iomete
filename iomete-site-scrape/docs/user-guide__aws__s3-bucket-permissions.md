@@ -1,0 +1,283 @@
+<!-- source: https://iomete.com/resources/user-guide/aws/s3-bucket-permissions | scraped 2026-11-01 -->
+
+Page title: AWS S3 Buckets Access | IOMETE
+URL: https://iomete.com/resources/user-guide/aws/s3-bucket-permissions
+Meta description: Learn how to provide access to external S3 buckets in IOMETE, a hybrid (cloud & on-premises based) data platform for data storage and analysis. This guide outlines simple steps to connect to S3 buckets and grant permission to the Lakehouse role.
+
+---
+
+- AWS
+- S3 Buckets Access
+
+On this page
+
+# AWS S3 Buckets Access
+
+IOMETE is a hybrid (cloud & on-premises) platform that allows users to store, manage, and analyze large amounts of data. One of the key features of IOMETE is the ability to connect any S3 buckets and access data from them.
+
+In order to do this, you need to provide permission to the Lakehouse Role.
+
+info
+
+To find the Lakehouse role, go to the IOMETE Console > Settings > Data Plane > General and look for the Lakehouse Role ARN field.
+
+What is the Lakehouse Role?
+
+The Lakehouse role is an AWS IAM role used by IOMETE Data Plane compute resources (Spark driver and executor pods) to access S3. On AWS, it works via IRSA (IAM Roles for Service Accounts) — the pods run under the lakehouse-service-account Kubernetes service account, which is annotated with the role ARN so AWS automatically issues temporary credentials. The Lakehouse role is created during the IOMETE Data Plane installation process.
+
+From 3.19.1, if the Helm chart creates the service account (serviceAccount.create: true), set the role ARN annotation in values.yaml:
+
+```
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account-id>:role/<lakehouse-role>
+
+```
+
+Running IOMETE outside AWS?
+
+If your data plane runs on-prem with Apache Ozone, Dell ECS, MinIO, or another S3-compatible store, the AWS IAM role does not apply. S3 access uses static access/secret keys and an endpoint URL configured in the data plane Helm values — there is no IAM role to update. The rest of this page covers AWS deployments only.
+
+## Options to provide access to S3 buckets
+
+AWS provides essentially two ways to provide access to S3 buckets:
+
+- Bucket Policy: You can create a bucket policy that allows access to the S3 bucket from the Lakehouse role.
+- IAM Role Policy: You can create an IAM role policy that allows access to the S3 bucket and attach it to the Lakehouse role.
+
+## Bucket Policy
+
+The easiest way to grant access to the Lakehouse role is to create a bucket policy that allows the role to access the bucket. Since the Lakehouse clusters, Spark jobs, and notebooks are all running under the Lakehouse role, you only need to provide access to the Lakehouse role.
+
+To set the bucket policy, you need to navigate to your S3 bucket's permissions page.
+
+- Go to your S3 console and select your desired bucket.
+- Click on the "Permissions" tab, and then click on "Bucket Policy".
+- Copy and paste the appropriate policy from the examples below into the bucket policy editor.
+- Replace <lakehouse_role> with the name of your Lakehouse role, and <your_bucket> with the name of your S3 bucket.
+- Click on "Save".
+
+Once saved, you should see a message at the top of the page that says "Bucket policy has been updated." You have now successfully granted access to your external S3 bucket for your Lakehouse role!
+
+### Example 1. Full read/write access to your bucket from Lakehouse role:
+
+Let's say you have a bucket called my-bucket and you want to give access to the Lakehouse role. You can create a bucket policy that looks like this. Replace <lakehouse_role> with the Lakehouse role and <your_bucket> with the name of your bucket.
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "<lakehouse_role>"
+                ]
+            },
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads",
+                "s3:ListMultipartUploadParts",
+                "s3:AbortMultipartUpload"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+This policy provides full read/write access to your bucket from the Lakehouse role.
+
+### Example 2. Read-only access to your bucket from Lakehouse role:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "<lakehouse_role>"
+                ]
+            },
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+This policy provides read-only access to your bucket from the Lakehouse role.
+
+### Example 3. Read-only access to a specific folder in your bucket from Lakehouse role:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "AWS": [
+                    "<lakehouse_role>"
+                ]
+            },
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/folder/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+This policy provides read-only access to a specific folder in your bucket from the Lakehouse role.
+
+## IAM Role Policy
+
+Another way to provide access to the Lakehouse role is to create an IAM role policy that allows access to the S3 bucket and attach it to the Lakehouse role.
+
+### Attaching the IAM Role Policy
+
+To attach the IAM role policy to the Lakehouse role, you need to navigate to the IAM console.
+
+- Go to your IAM console and select Roles from the left-hand menu.
+- Search for the Lakehouse role in the list of roles and click on it.
+- Click on the Permissions tab, and then click on Add inline policy.
+- See below for the examples to create a policy. You can copy and paste the policy into the JSON editor.
+- Click on Review policy. Give your policy a name and click on Create policy.
+
+You have now successfully attached the IAM role policy to the Lakehouse role. You can now use the Lakehouse role to access the S3 bucket from IOMETE.
+
+note
+
+Alternative to Inline policy, you can also create a Managed policy from Policies in the IAM console and attach it to the Lakehouse role.
+
+Here are some examples of IAM role policies that you can attach to the Lakehouse role:
+
+### Example 1. Full read/write access to your bucket:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:PutObject",
+                "s3:DeleteObject",
+                "s3:ListBucket",
+                "s3:ListBucketMultipartUploads",
+                "s3:ListMultipartUploadParts",
+                "s3:AbortMultipartUpload"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+Replace <your_bucket> with the name of your S3 bucket that you want to provide access to.
+
+info
+
+You already noticed that, IAM role policy does not require to specify the Principal field as it is already attached to the Lakehouse role.
+
+### Example 2. Read-only access to your bucket:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+### Example 3. Read-only access to a specific folder in your bucket:
+
+```
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket"
+            ],
+            "Resource": [
+                "arn:aws:s3:::<your_bucket>/folder/*",
+                "arn:aws:s3:::<your_bucket>"
+            ]
+        }
+    ]
+}
+
+```
+
+info
+
+In the Resource field, you can specify multiple resources by separating them with a comma do provide access to multiple buckets or folders.
+
+If you have any questions or need further assistance, please feel free to reach out to our support team. We are always here to help you with any questions or issues you may have.
+
+Previous
+
+Arrow Flight SQL JDBC Driver
+
+Next
+
+Glue Catalog Permissions
+
+## ON THIS PAGE
+
+- Options to provide access to S3 buckets
+- Bucket Policy
+
+- Example 1. Full read/write access to your bucket from Lakehouse role:
+- Example 2. Read-only access to your bucket from Lakehouse role:
+- Example 3. Read-only access to a specific folder in your bucket from Lakehouse role:
+
+- IAM Role Policy
+
+- Attaching the IAM Role Policy
+- Example 1. Full read/write access to your bucket:
+- Example 2. Read-only access to your bucket:
+- Example 3. Read-only access to a specific folder in your bucket:

@@ -1,0 +1,365 @@
+<!-- source: https://iomete.com/resources/user-guide/driver/arrow-flight-jdbc-driver | scraped 2026-11-01 -->
+
+Page title: Arrow Flight SQL JDBC Driver | IOMETE
+URL: https://iomete.com/resources/user-guide/driver/arrow-flight-jdbc-driver
+Meta description: IOMETE's Arrow Flight SQL JDBC driver, a fork of the standard driver adding proxy support, query timeout, named parameters, BI catalog scoping, and default string column lengths.
+
+---
+
+- Client & Libraries
+- Arrow Flight SQL JDBC Driver
+
+On this page
+
+# Arrow Flight SQL JDBC Driver
+
+IOMETE provides a custom release of the Apache Arrow Flight SQL JDBC driver. It's functionally identical to the upstream driver, with a few IOMETE-specific additions:
+
+- HTTP CONNECT proxy tunneling: routes gRPC/Flight connections through an enterprise HTTP proxy ›
+- Connection-level query timeout: sets a per-connection default timeout applied to every statement ›
+- Named parameters: allows :name syntax as an alternative to positional ? markers ›
+- Catalog scoping for BI tools: pins a connection to one catalog for clients that aren't catalog-aware (such as Oracle) ›
+- Default string column length: reports a length for Spark STRING columns to tools that size columns from JDBC metadata (such as Oracle BI Publisher) ›
+
+It also supports standard mutual TLS and can present a client certificate when your endpoint requires one. See Client Certificates (mTLS).
+
+## Download the Driver
+
+IOMETE maintains its own build of the Arrow Flight SQL driver. Download the latest release from the iomete-artifacts GitHub repository.
+
+Driver artifacts follow the naming convention flight-sql-jdbc-driver-<upstream>-iomete.<release>.jar, where <upstream> is the Arrow Flight SQL version and <release> is the IOMETE release number (e.g. flight-sql-jdbc-driver-19.0.0-iomete.3.jar).
+
+## Query Timeout
+
+Requires IOMETE ≥ 3.17.1.
+
+Without a timeout, a slow or stuck query can hold a connection open indefinitely. To cap that, set a default timeout for all statements on a connection: add queryTimeout=<seconds> to the JDBC URL, or pass it as a connection property if your client supports one.
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&queryTimeout=30
+
+```
+
+The timeout applies to every statement executed on that connection. A value of 0 (the default) means no timeout. Individual statements can still override this via the standard Statement.setQueryTimeout() method.
+
+## Named Parameters
+
+Requires IOMETE ≥ 3.16.0.
+
+Named parameters keep prepared statements readable when a query has many bind variables. Instead of counting ? positions, you reference each value by name. Prepared statements support :name syntax as an alternative to positional ? markers. The driver automatically translates named parameters to positional placeholders before sending the query.
+
+```
+NamedPreparedStatement ps = (NamedPreparedStatement)
+    conn.prepareStatement("SELECT * FROM orders WHERE status = :status AND region = :region");
+ps.setString("status", "active");
+ps.setString("region", "europe");
+ResultSet rs = ps.executeQuery();
+
+```
+
+The same name can appear multiple times in a query, and the driver binds the value to every occurrence. Positional ? and named :name markers cannot be mixed in the same statement.
+
+## Catalog Scoping for BI Tools
+
+Requires driver ≥ 19.0.0-iomete.3.
+
+Some JDBC clients aren't catalog-aware. Business Intelligence (BI) tools such as Oracle Analytics Server and BI Publisher assume a two-part schema.table name hierarchy and drop the catalog prefix entirely. Since IOMETE organizes data in three parts (catalog.schema.table), these clients mix schemas and tables from every catalog together in their object lists, and their queries fail because two-part names don't say which catalog to use.
+
+Catalog scoping fixes this by pinning the connection to a single catalog: the client keeps using two-part names, and the driver supplies the catalog they leave out. To enable it, set compatibilityMode=oracle (or catalogFilterEnabled=true) and name the catalog in the schema parameter.
+
+| Parameter | Values | Default | Effect
+
+| compatibilityMode | oracle | unset | Turns on catalog filtering for Oracle-style tools. Other values have no effect.
+
+| catalogFilterEnabled | true / false | false | Turns catalog filtering on or off directly. An explicit value always overrides compatibilityMode.
+
+| schema | catalog[.namespace] | unset | The first (catalog) part becomes the metadata filter. Anything after the first dot is an execution hint only, not a metadata filter.
+
+When scoping is on, the driver limits metadata calls (getCatalogs, getSchemas, getTables, getColumns, and the key-metadata calls) to the catalog you name. Scoping works at the catalog level: within the pinned catalog, all schemas and tables stay visible. To reach more than one catalog from a client that isn't catalog-aware, define one connection per catalog.
+
+### Scoping Examples
+
+Append the catalog parameters to your base JDBC URL (jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>):
+
+```
+# Pin an Oracle BI connection to a single catalog
+...&compatibilityMode=oracle&schema=spark_catalog
+
+# Scope metadata to a catalog, with a namespace hint within it
+...&compatibilityMode=oracle&schema=spark_catalog.sales
+
+# Turn on scoping for a non-Oracle tool that isn't catalog-aware
+...&catalogFilterEnabled=true&schema=spark_catalog
+
+```
+
+note
+
+- Existing connections are unaffected: without compatibilityMode or catalogFilterEnabled, schema behaves exactly as before.
+- If schema is malformed, the driver ignores the filter and logs a warning instead of failing the connection.
+
+## Default String Column Length
+
+Requires driver ≥ 19.0.0-iomete.7.
+
+Spark STRING columns have no declared length, so the driver reports their precision and display size in ResultSetMetaData as 0. Most clients ignore this, but tools that size string columns from that metadata, such as Oracle BI Publisher, render those columns empty.
+
+To report a length instead, set defaultStringColumnLength to a positive integer in the JDBC URL or as a connection property:
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&defaultStringColumnLength=255
+
+```
+
+The driver then reports that value as the precision and display size of every string column in a query result. Choose a length that fits the longest values in your string columns, because tools that size columns from this metadata may cut off longer values.
+
+note
+
+- Existing connections are unaffected: without defaultStringColumnLength, string columns report 0 as before. A blank value counts as unset.
+- A length sent by the server always takes precedence over the configured value.
+- The setting applies to query result metadata only. DatabaseMetaData results, including COLUMN_SIZE from getColumns, are unchanged.
+- An invalid value (0, a negative number, or a non-numeric value) makes queries fail with an error that names the property.
+
+## HTTP Proxy Configuration
+
+You configure the proxy through query parameters on the JDBC URL, so your application code doesn't change.
+
+The proxy must support HTTP CONNECT tunneling (standard for HTTPS/gRPC traffic). SOCKS proxies are not supported. Proxy authentication (proxy username/password) isn't currently supported, so the proxy must allow unauthenticated CONNECT.
+
+### Connection Parameters
+
+| Parameter | Type | Default | Description
+
+| proxyHost | string | — | Hostname or IP of the HTTP proxy
+
+| proxyPort | integer | — | Port of the HTTP proxy
+
+| proxyBypassPattern | string | — | Hosts to connect directly, bypassing the proxy (see format below)
+
+| proxyDisable | string | — | Set to force to disable proxy resolution entirely
+
+note
+
+proxyHost and proxyPort must be set together. If only one is provided, the explicit proxy is ignored and the driver falls back to the JVM's system proxy selector.
+
+#### Resolution Priority
+
+When establishing a connection, the driver resolves the proxy in this order:
+
+- proxyDisable=force → connect directly, no proxy
+- Target host matches proxyBypassPattern → connect directly
+- proxyHost + proxyPort are both set → use this explicit proxy
+- JVM system proxy (java.net.ProxySelector) → use the first non-DIRECT proxy found
+- No proxy found → connect directly
+
+#### proxyBypassPattern Format
+
+Uses the same format as the JVM http.nonProxyHosts system property:
+
+- Patterns separated by |
+- * is a wildcard matching any sequence of characters
+- Matching is case-insensitive
+
+| Pattern | Matches
+
+| localhost | localhost only
+
+| *.internal | db.internal, api.internal, etc.
+
+| localhost|*.internal|10.0.* | any of the above
+
+### JVM System Proxy Fallback
+
+If proxyHost/proxyPort are not set, the driver automatically falls back to the JVM's proxy selector. Standard JVM proxy properties are respected:
+
+```
+java -Dhttps.proxyHost=proxy.corp.internal -Dhttps.proxyPort=3128 -jar your-app.jar
+
+```
+
+You can also set proxyHost/proxyPort directly in the JDBC URL to use a connection-specific proxy, independently of the JVM-level proxy. So you can route general Java traffic through one proxy and IOMETE JDBC connections through another.
+
+To suppress JVM proxy resolution for a specific connection without changing JVM properties, add proxyDisable=force to the JDBC URL.
+
+### Proxy Examples
+
+All examples use the base JDBC URL format:
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>
+
+```
+
+Replace <host>, <port>, <username>, and <token> with your cluster's connection details from the IOMETE console.
+
+#### Route all traffic through a proxy
+
+Uses proxyHost and proxyPort.
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&proxyHost=proxy.corp.internal&proxyPort=3128
+
+```
+
+#### Bypass proxy for internal hosts
+
+Uses proxyHost, proxyPort, and proxyBypassPattern to route internal traffic directly.
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&proxyHost=proxy.corp.internal&proxyPort=3128&proxyBypassPattern=*.internal|localhost
+
+```
+
+#### Disable proxy entirely
+
+Uses proxyDisable=force to override any JVM-level proxy configuration for this connection.
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&proxyDisable=force
+
+```
+
+## Client Certificates (mTLS)
+
+If your IOMETE endpoint requires mutual TLS, the driver can present a client certificate during the handshake. It does so only when all three properties below are set, so a missing useEncryption=true silently drops the certificate.
+
+| Purpose | Property | Value
+
+| Enable TLS | useEncryption | true (required, or the certificate is never attached)
+
+| Client certificate | clientCertificate | Filesystem path to the client certificate PEM
+
+| Client key | clientKey | Filesystem path to the client key PEM
+
+```
+jdbc:arrow-flight-sql://<host>:<port>?user=<username>&password=<token>&useEncryption=true&clientCertificate=/path/to/client-cert.pem&clientKey=/path/to/client-key.pem
+
+```
+
+## Java Version Requirements
+
+For performance reasons, the Apache Arrow JDBC driver manages its own memory directly instead of leaving it to Java's garbage collector. It does this through low-level Java internals that recent Java versions lock down by default. As a result, on Java 16 and newer you must add one or two extra startup flags to whichever program loads the driver, whether that's DBeaver, Oracle BI, your own Java application, or another JDBC client. Without them, the driver fails while setting up its memory, usually at connect time or on the first query. The exact flags depend on your Java version (see the matrix below).
+
+This is a known requirement of every Arrow-based driver (upstream and the IOMETE build alike), not an IOMETE-specific bug. Apache Arrow documents it in its Installing Java Modules guide. It can't be fixed inside the driver: a driver can't change the Java startup options of the program that loads it.
+
+### Flag Matrix
+
+Find your Java version below to see which flags to add.
+
+| Java version | Flags to add | Why
+
+| 8–15 | None | No limits on direct-memory access
+
+| 16–23 | --add-opens=java.base/java.nio=ALL-UNNAMED | Java's module system now blocks the driver's direct-memory access (JEP 396)
+
+| 24 | --add-opens=java.base/java.nio=ALL-UNNAMED
+--sun-misc-unsafe-memory-access=allow (recommended) | The driver still works on Java 24 with only --add-opens, but its use of the internal Unsafe memory API now prints a deprecation warning; allow silences it (JEP 498)
+
+| 25+ | --add-opens=java.base/java.nio=ALL-UNNAMED
+--sun-misc-unsafe-memory-access=allow | Java now denies the internal Unsafe memory API by default; without allow the driver can't initialize its memory allocator and fails at connect time (JEP 498)
+
+warning
+
+--sun-misc-unsafe-memory-access=allow exists only on Java 24 and newer. Adding it on an older version stops Java from starting, so add it only when you actually run Java 24 or later.
+
+Use exactly =allow. The other accepted values (=warn, =deny) both make the driver fail to initialize its allocator, even on Java 24 where the default (flag omitted) otherwise works.
+
+### Symptoms Without the Flags
+
+If the flags are missing, the connection fails while the driver sets up its memory. The exact error depends on your Java version.
+
+On Java 16–23, you get a reflective-access error, one of:
+
+```
+InaccessibleObjectException: module java.base does not "opens java.nio" to unnamed module
+UnsupportedOperationException: sun.misc.Unsafe or java.nio.DirectByteBuffer.<init>(long, int) not available
+
+```
+
+On Java 24, the driver still connects with only --add-opens, but prints a deprecation warning on first use:
+
+```
+WARNING: A terminally deprecated method in sun.misc.Unsafe has been called
+WARNING: sun.misc.Unsafe::allocateMemory has been called by ...io.netty.util.internal.PlatformDependent0
+
+```
+
+Add --sun-misc-unsafe-memory-access=allow to silence it.
+
+On Java 25 and newer, the same Unsafe access is denied by default, so the driver fails outright while initializing its allocator (from the bundled Netty library):
+
+```
+ExceptionInInitializerError: Could not initialize class ...RootAllocator
+Caused by: UnsupportedOperationException ... EmptyByteBuf.memoryAddress()
+
+```
+
+### Passing the Flags
+
+Add the flags to the program that loads the driver. For an application you launch yourself:
+
+```
+java --add-opens=java.base/java.nio=ALL-UNNAMED \
+     --sun-misc-unsafe-memory-access=allow \
+     -jar your-app.jar
+
+```
+
+If you can't edit the launch command (for example, a tool that starts its own Java runtime), set the JDK_JAVA_OPTIONS environment variable instead. Java reads it automatically:
+
+```
+export JDK_JAVA_OPTIONS="--add-opens=java.base/java.nio=ALL-UNNAMED --sun-misc-unsafe-memory-access=allow"
+
+```
+
+For GUI database tools and application servers, the flags go in that product's own Java settings, not in your application:
+
+- DBeaver: add them to dbeaver.ini. See Java Version Requirements in the DBeaver guide.
+- Oracle BI / BI Publisher (WebLogic): add them to the domain's Java options, for example setDomainEnv.sh via EXTRA_JAVA_PROPERTIES, or the JDK_JAVA_OPTIONS environment variable, then restart the server.
+
+note
+
+Apache Arrow documents the longer form --add-opens=java.base/java.nio=org.apache.arrow.memory.core,ALL-UNNAMED. Because the driver ships Arrow shaded on the classpath (the unnamed module), the ALL-UNNAMED target is the part that matters; the shorter form above is sufficient. See Arrow's Installing Java Modules guide.
+
+## Resources
+
+DBeaver Integration
+
+Connect DBeaver to IOMETE using the Arrow Flight SQL JDBC driver
+
+Dataiku Integration
+
+Connect Dataiku to IOMETE using the Arrow Flight SQL JDBC driver
+
+Previous
+
+Hive JDBC Driver
+
+Next
+
+S3 Buckets Access
+
+## ON THIS PAGE
+
+- Download the Driver
+- Query Timeout
+- Named Parameters
+- Catalog Scoping for BI Tools
+
+- Scoping Examples
+
+- Default String Column Length
+- HTTP Proxy Configuration
+
+- Connection Parameters
+- JVM System Proxy Fallback
+- Proxy Examples
+
+- Client Certificates (mTLS)
+- Java Version Requirements
+
+- Flag Matrix
+- Symptoms Without the Flags
+- Passing the Flags
+
+- Resources

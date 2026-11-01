@@ -1,0 +1,176 @@
+<!-- source: https://iomete.com/resources/user-guide/reference/data-sources/snowflake-connector | scraped 2026-11-01 -->
+
+Page title: Read & Write Snowflake from Spark (PySpark, Scala) | IOMETE
+URL: https://iomete.com/resources/user-guide/reference/data-sources/snowflake-connector
+Meta description: How to read from and write to Snowflake with the Spark Snowflake connector on IOMETE: SQL and DataFrame examples in PySpark and Scala, with key options.
+
+---
+
+- Data Sources
+- Snowflake Connector
+
+On this page
+
+# Read & Write Snowflake from Spark (PySpark, Scala)
+
+IOMETE provides a Snowflake connector to support reading and writing data from Snowflake.
+
+info
+
+The connector is already included in the IOMETE distribution package. No additional installation is required.
+
+## Query a Snowflake table in IOMETE
+
+You can configure a connection to Snowflake and then query data:
+
+```
+-- Create a new table in Spark linked to a Snowflake table
+CREATE TABLE snowflake_table
+USING snowflake
+OPTIONS (
+    dbtable '<table-name>',  -- Name of the table in Snowflake
+    sfUrl '<snowflake-account-url>',  -- Snowflake account URL
+    sfUser '<username>',  -- Username for Snowflake account
+    sfPassword '<password>',  -- Password for the username
+    sfDatabase '<database-name>',  -- Database name in Snowflake
+    sfSchema '<schema-name>',  -- Schema name within the database
+    sfWarehouse '<warehouse-name>'  -- Virtual warehouse for data processing
+);
+
+-- Query the table
+SELECT * FROM snowflake_table LIMIT 100;
+
+```
+
+The CREATE TABLE statement with the Snowflake Spark Connector is used to define a new table in Spark that is backed by a table in Snowflake. Below is an explanation of each parameter in the OPTIONS clause:
+
+### Parameters
+
+#### dbtable '<table-name>'
+
+- Description: Specifies the name of the table in Snowflake that you want to connect to.
+- Example: If your Snowflake table is named employees, you would set dbtable 'employees'.
+
+#### sfUrl '<snowflake-account-url>'
+
+- Description: The URL of the Snowflake account you are connecting to.
+- Example: <account_identifier>.<region_id>.<cloud_provider>.snowflakecomputing.com (e.g. xy12345.us-east-1.aws.snowflakecomputing.com).
+
+#### sfUser '<username>'
+
+- Description: The username used to authenticate with Snowflake.
+- Example: If your Snowflake username is john_doe, you would set sfUser 'john_doe'.
+
+#### sfPassword '<password>'
+
+- Description: The password corresponding to the username, used for authentication.
+- Example: If your password is myPassword123, you would set sfPassword 'myPassword123'.
+
+#### sfDatabase '<database-name>'
+
+- Description: The name of the Snowflake database you want to use.
+- Example: If you are using a database named hr_db, you would set sfDatabase 'hr_db'.
+
+#### sfSchema '<schema-name>'
+
+- Description: The name of the schema within the Snowflake database.
+- Example: If you are using a schema named public, you would set sfSchema 'public'.
+
+#### sfWarehouse '<warehouse-name>'
+
+- Description: The name of the Snowflake virtual warehouse to use for the data processing tasks.
+- Example: If you are using a warehouse named my_warehouse, you would set sfWarehouse 'my_warehouse'.
+
+## Data frame API
+
+Data frame readers and writers are also available:
+
+### Pyspark example:
+
+```
+snowflake_table = (spark.read
+  .format("snowflake")
+  .option("dbtable", table_name)
+  .option("sfUrl", database_host_url)
+  .option("sfUser", username)
+  .option("sfPassword", password)
+  .option("sfDatabase", database_name)
+  .option("sfSchema", schema_name)
+  .option("sfWarehouse", warehouse_name)
+  .load()
+)
+
+```
+
+### Scala example:
+
+```
+val snowflake_table = spark.read
+  .format("snowflake")
+  .option("dbtable", table_name)
+  .option("sfUrl", database_host_url)
+  .option("sfUser", username)
+  .option("sfPassword", password)
+  .option("sfDatabase", database_name)
+  .option("sfSchema", schema_name)
+  .option("sfWarehouse", warehouse_name)
+  .load()
+
+```
+
+### Pyspark example writing data to Snowflake and read it back
+
+```
+import os
+
+snowflake_user = os.getenv('SNOWFLAKE_USER')
+snowflake_password = os.environ.get('SNOWFLAKE_PASSWORD')
+
+options = {
+  "sfUrl": "<snowflake-url>",
+  "sfUser": snowflake_user,
+  "sfPassword": snowflake_password,
+  "sfDatabase": "<snowflake-database>",
+  "sfSchema": "<snowflake-schema>",
+  "sfWarehouse": "<snowflake-cluster>"
+}
+
+# Generate a simple dataset containing five values and write the dataset to Snowflake.
+spark.range(5).write \
+  .format("snowflake") \
+  .options(**options) \
+  .option("dbtable", "table_name") \
+  .save()
+
+# Read the data written by the previous cell back.
+df = spark.read \
+  .format("snowflake") \
+  .options(options) \
+  .option("dbtable", "table_name") \
+  .load()
+
+df.show()
+
+```
+
+See Snowflake Connector for Spark for more usage information.
+
+Previous
+
+JDBC Sources
+
+Next
+
+CSV Files
+
+## ON THIS PAGE
+
+- Query a Snowflake table in IOMETE
+
+- Parameters
+
+- Data frame API
+
+- Pyspark example:
+- Scala example:
+- Pyspark example writing data to Snowflake and read it back

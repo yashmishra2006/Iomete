@@ -1,0 +1,507 @@
+<!-- source: https://iomete.com/resources/deployment/architecture-deployment | scraped 2026-11-01 -->
+
+Page title: Deployment Architecture | IOMETE
+URL: https://iomete.com/resources/deployment/architecture-deployment
+Meta description: Technical reference for IOMETE's Kubernetes deployment topology, complete service inventory, feature flags, and infrastructure configuration.
+
+---
+
+- Deployment
+- Deployment Architecture
+
+On this page
+
+# Deployment Architecture
+
+This reference describes how IOMETE maps onto Kubernetes: the Helm chart structure, the full service inventory, feature flags, and infrastructure options. For a conceptual overview of each service, see the Architecture Overview. For installation steps, see the On-Premises Deployment Guide.
+
+## Helm Chart Structure
+
+Everything ships as a single Helm chart (iomete-data-plane-enterprise), which deploys all platform services into one Kubernetes namespace. Services talk to each other over internal Kubernetes DNS.
+
+### Initialization Job
+
+Before any service starts, a pre-install/pre-upgrade Helm hook job (iomete-data-plane-init) bootstraps the environment:
+
+- Creates PostgreSQL databases for each microservice
+- Creates the Hive Metastore secret
+- Creates the Hadoop configuration secret
+- Creates the Spark ConfigMap
+- Creates the Spark History folder in object storage
+
+Init Job Failures
+
+This job runs with backoffLimit: 2. If it fails, the entire Helm install or upgrade fails. When troubleshooting a failed deployment, check the init job logs first.
+
+### Configuration Distribution
+
+All Helm values (including feature flags) are serialized to YAML and stored in a Kubernetes Secret named data-plane. Every backend microservice reads this secret at startup, so a Helm upgrade propagates config changes to all services on their next restart.
+
+## Service Inventory
+
+Knowing which services run (and which are optional) helps you plan resource allocation and troubleshoot startup issues. The table below lists every service the Helm chart deploys. Services tied to a feature flag only appear when that flag is enabled.
+
+| Service | Type | Feature Flag | Notes
+
+| iom-gateway | Deployment | Always | Nginx reverse proxy, entry point
+
+| iom-app | Deployment | Always | Frontend SPA (Nginx)
+
+| iom-core | Deployment | Always | Platform settings, auth, Spark History proxy
+
+| iom-cluster | Deployment | Always | Spark resource management
+
+| iom-identity | Deployment | Always | IAM, Ranger, SSO, domains
+
+| iom-sql | Deployment | Always | SQL editor backend
+
+| iom-catalog | Deployment | Always | Data catalog, governance
+
+| iom-rest-catalog | Deployment | Always | Iceberg REST Catalog
+
+| iom-health-check | Deployment | Always | Service health monitoring
+
+| iom-socket | Deployment | Always | WebSocket relay
+
+| spark-operator-controller | Deployment | Always | Spark CRD controller
+
+| spark-operator-webhook | Deployment | Always | Admission webhook
+
+| spark-submit-service | Deployment | Always | Spark app submission
+
+| spark-connect-driver | SparkApplication | Always | Internal metadata extraction
+
+| spark-connect-rest | Deployment | Always | REST client for Spark Connect
+
+| spark-history | Deployment | Always | Spark job history UI
+
+| metastore | Deployment | Always | Hive Metastore
+
+| typesense | Deployment | Always | Search engine (20Gi PVC)
+
+| iom-collab | Deployment | enableCollaborativeSqlEditor | Collaborative SQL editing
+
+| nats | StatefulSet (3 replicas) | services.nats.enabled | JetStream messaging
+
+| iom-event-stream | StatefulSet (2 replicas) | Always | Event ingestion + Iceberg writer
+
+| iom-event-stream-proxy | Deployment | eventStream | Ingestion request routing
+
+| prefect-server | Deployment | Always | Workflow orchestration
+
+| prefect-worker | Deployment (per-namespace) | Always | Scheduled job execution
+
+| iom-maintenance | Deployment | Always | Table compaction
+
+| iom-ratelimiter | Deployment | ratelimiter | Redis-based rate limiting
+
+| spark-proxy-server | Deployment (per-namespace) | sparkProxyForArrowFlight | Arrow Flight proxy
+
+All Quarkus-based services expose /health for startup, liveness and readiness probes. From 3.19.1, you can change the probe timings under services.probes in values.yaml. They use a RollingUpdate strategy (maxUnavailable: 0, maxSurge: 1), so at least one replica stays available during deploys.
+
+## Gateway Routing
+
+Every request into the platform passes through the Gateway (an Nginx reverse proxy), which routes traffic to the correct backend based on URI prefix. The tables below show the complete routing map.
+
+### API Routes
+
+| URI Pattern | Backend Service
+
+| /api/v*/domains/*/sql, /api/v*/domains/*/git | iom-sql
+
+| /api/v*/health-check | iom-health-check
+
+| /api/v*/admin/compaction, /api/v*/domains/*/compaction | iom-maintenance
+
+| /api/v*/domains/*/data-catalog, /api/v*/domains/*/data-product, /api/v*/domains/*/governance, /api/v*/admin/governance | iom-catalog
+
+| /api/v*/authz, /api/v*/auth, /api/v*/data-planes, /api/v*/modules, /api/v*/system-config, /api/v*/admin/node-types, /api/v*/admin/volumes | iom-core
+
+| /api/v*/domains/*/compute, /api/v*/domains/*/spark/*, /api/v*/domains/*/jupyter-containers, /api/v*/domains/*/namespaces, /api/v*/domains/*/secrets, /api/v*/domains/*/schedules, /api/v*/domains/*/event-streams | iom-cluster
+
+| /api/v*/domains/*/roles, /api/v*/domains/*/members, /api/v*/admin/identity, /api/v*/admin/domains, /api/v*/users, /api/v*/groups, /api/v*/bundles, /api/v*/identity | iom-identity
+
+### Non-API Routes
+
+| URI Pattern | Backend Service | Protocol
+
+| / (default), /domains/*, /admin/* | iom-app | HTTP
+
+| /catalogs/ | iom-rest-catalog | HTTP
+
+| /socket.io | iom-socket | WebSocket
+
+| /collaboration | iom-collab | WebSocket (feature-flagged)
+
+| /spark-history, /spark-ui, /monitoring | iom-core | HTTP
+
+| /sso-proxy | iom-core | HTTP
+
+| /service/(plugins|roles|xusers|tags) | iom-identity | HTTP (Ranger admin API)
+
+### Dynamic Workload Routes
+
+| URI Pattern | Target | Protocol
+
+| /data-plane/*/lakehouse/*/... | cc-<name>.<ns>:10000 | HTTP (HiveServer2 JDBC)
+
+| /spark.connect.* | cc-<name>.<ns>:15002 | gRPC (Spark Connect)
+
+| /arrow.flight.protocol.FlightService | cc-<name>.<ns>:33333 or Spark Proxy | gRPC (Arrow Flight)
+
+| /data-plane/*/jupyter/*/... | jc-<name>.<ns>:8888 | HTTP + WebSocket
+
+| /data-plane/*/event-stream/*/... | iom-event-stream-proxy | HTTP
+
+The Gateway supports gRPC for Spark Connect and Arrow Flight, with keepalive enabled and a 24-hour read timeout (86400s).
+
+## Node Placement
+
+To keep platform services and Spark workloads on separate hardware, the chart exposes two pairs of node selectors and tolerations:
+
+| Setting | Applied To | Purpose
+
+| controlPlaneNodeSelector / controlPlaneTolerations | All IOMETE platform services | Isolate control plane on dedicated nodes
+
+| dataPlaneNodeSelector / dataPlaneTolerations | Spark workloads (drivers, executors) | Isolate compute on data nodes
+
+## Multi-Namespace Support
+
+If different teams need separate CPU and memory quotas, you can deploy Spark workloads (drivers and executors) into additional namespaces via the namespaces list in values.yaml. The data plane's own namespace is always included automatically.
+
+Each extra namespace gets its own copies of:
+
+- Prefect Worker
+- Spark Proxy Server (when Arrow Flight proxy is enabled)
+- Event Stream pods (when event streams are enabled)
+
+IOMETE doesn't create the quotas themselves. See Namespace Quotas. For details, see Connect Namespace. For full multi-cluster topology, see Multi-Cluster Setup.
+
+## Priority Classes
+
+PriorityClasses let Kubernetes preempt lower-priority pods when resources are scarce. When priorityClasses is enabled, Spark workloads are assigned these classes:
+
+| Priority Class | Workload Type
+
+| iomete-compute | Compute clusters
+
+| iomete-spark-job | Spark jobs
+
+| iomete-notebook | Jupyter containers
+
+| iomete-operational-support | Job Orchestrator workers
+
+## Autoscaling
+
+For services that handle variable load, you can turn on Horizontal Pod Autoscaling (HPA). It's disabled by default and must be enabled per-service in values.yaml.
+
+| Service | HPA Support | Notes
+
+| iom-gateway | Yes | Disabled by default
+
+| iom-core | Yes | Disabled by default
+
+| iom-cluster | Yes | Disabled by default
+
+| iom-identity | Yes | Disabled by default
+
+| iom-catalog | Yes | Disabled by default
+
+| iom-rest-catalog | Yes | Disabled by default
+
+| spark-submit-service | Yes | Disabled by default
+
+| iom-collab | Yes | Memory-based (85%) primary, CPU (80%) secondary
+
+| iom-event-stream-proxy | Yes | Enabled by default (1-4 replicas, 80% CPU)
+
+| iom-sql | No | Fixed at 1 replica
+
+## Feature Flags
+
+Feature flags control what gets deployed and how the platform behaves. Most live in values.yaml under features: and reach every service through the data-plane secret. A few flags use different paths (noted in the table).
+
+### Deployment Flags
+
+These flags control whether entire services or subsystems are deployed at all:
+
+| Flag | Services Deployed | Default
+
+| enableCollaborativeSqlEditor | iom-collab | false
+
+| services.nats.enabled | NATS cluster | false
+
+| eventStream | iom-event-stream-proxy | false
+
+| sparkProxyForArrowFlight | spark-proxy-server (per-namespace) | false
+
+| ratelimiter | iom-ratelimiter | false
+
+| jupyterContainers | jupyter-containers ConfigMap | false
+
+### Runtime Behavior Flags
+
+These flags toggle features without adding or removing services:
+
+| Flag | Effect When Enabled | Default
+
+| arrowFlightConnection | Arrow Flight connections available for compute clusters | true
+
+| arrowFlightForDbExplorer | DB Explorer uses Arrow Flight instead of Spark Connect REST | false
+
+| activityMonitoring | Query monitoring and resource tracking | false
+
+| downloadQueryResults | SQL query result download in UI | true
+
+| caseInsensitiveIcebergIdentifiers | Iceberg table/database names are case-insensitive | false
+
+| iometeSparkLivenessProbe | Additional liveness probe on Spark driver pods | true
+
+| icebergRestCatalogStrictMode | Database must exist before creating tables | false
+
+| enforceUniqueIcebergTableLocations | Tables created without an explicit LOCATION get a unique storage directory, so a rename + recreate of the same name can't collide and let remove_orphan_files delete a live table's data (tables created with an explicit LOCATION are unaffected) | true
+
+| priorityClasses | Spark workloads use PriorityClasses | false
+
+| emailNotifications | Email notifications available | true
+
+| sparkJobArchival | Archival of Spark job history | false
+
+| onboardComputeRas | Resource Access Service for compute clusters | false
+
+| onboardSparkJobRas | Resource Access Service for Spark jobs | false
+
+| onboardWorkspaceRas | Resource Access Service for SQL workspaces | false
+
+| onboardNamespaceMappingRas | Namespace-level access control | false
+
+| domainLevelBundleAuthorization | Domain-level bundle-based authorization | false
+
+| secretsV2 | New secrets management system | false
+
+| dataAccessAudit | Data access audit logging | false
+
+| icebergMetrics | Iceberg table metrics sent to event stream | true
+
+| ldapGroupInheritance | LDAP group hierarchy inheritance | true
+
+| identitySoftDelete | Soft delete for users/groups | false
+
+| showExecutorLogs | Executor logs visible in UI | true
+
+Prerequisite Chain
+
+Don't enable domainLevelBundleAuthorization until all four RAS flags are active (onboardComputeRas, onboardSparkJobRas, onboardWorkspaceRas, onboardNamespaceMappingRas) and you've run the migration script. Skipping this order breaks authorization.
+
+## Storage Configuration
+
+### Object Storage
+
+All table data, Spark event logs, and SQL results live in object storage, making it the most important infrastructure dependency. Configure the provider and credentials in values.yaml.
+
+| Storage Type | Config Key | URI Scheme | Required Settings
+
+| S3-compatible (Apache Ozone, Dell ECS, IBM Cloud Object Storage, MinIO, and others) | s3_compatible | s3a:// | endpoint, accessKey, secretKey
+
+| MinIO (deprecated) | minio | s3a:// | endpoint, accessKey, secretKey
+
+| Dell ECS (deprecated) | dell_ecs | s3a:// | endpoint, accessKey, secretKey
+
+| AWS S3 | aws_s3 | s3a:// | IAM role, cloud.region
+
+| Google Cloud Storage | gcs | gs:// | GCP service account
+
+| Azure Blob (Gen1) | azure_gen1 | wasbs:// | storageAccountName, storageAccountKey
+
+| Azure Data Lake (Gen2) | azure_gen2 | abfs:// | storageAccountName, storageAccountKey
+
+From 3.19.1, use s3_compatible for any S3-compatible storage and set its endpoint and keys under storage.s3CompatibleSettings. The minio and dell_ecs types and their storage.minioSettings and storage.dellEcsSettings blocks are deprecated.
+
+Object storage paths:
+
+| Path | Contents
+
+| data/ | Lakehouse table data
+
+| iomete-assets/spark-history/ | Spark event logs
+
+| iomete-assets/sql-results/ | SQL query results
+
+| iomete-assets/sql-editor/worksheets/ | SQL editor worksheet content
+
+| ranger/audit | Ranger audit logs (when HDFS audit is enabled)
+
+### Database
+
+All services share a single PostgreSQL server. The init job creates databases with a configurable prefix (default: iomete_):
+
+- <prefix>metastore_db (Hive Metastore)
+- <prefix>ranger_db (Ranger policies)
+- <prefix>iceberg_db (Iceberg catalog metadata)
+- Per-microservice databases (Core, Cluster, Identity, SQL, Catalog, etc.)
+- <prefix>prefect_db (Prefect job orchestrator)
+- <prefix>mcp_db (MCP server OAuth state)
+
+Multi-cluster database support: You can point clusterDatabase at a different server than the main database. This is handy in multi-region setups where high-volume operations (Kubernetes/Spark data) hit a local database while metadata stays on a global one.
+
+SSL: PostgreSQL SSL is optional. When ssl.enabled is true, JDBC connections use sslmode=verify-full.
+
+Connection pooler: If database.host points at a connection pooler (for example PgBouncer), set database.directHost / database.directPort to the actual PostgreSQL endpoint. Schema migrations (every platform service's, including the MCP server's, which run automatically at startup) hold a session-scoped advisory lock and cannot run through a transaction pooler; all other traffic keeps using the pooler.
+
+## Secret Store
+
+You can choose where IOMETE keeps sensitive values like database passwords and API keys:
+
+| Type | Description
+
+| kubernetes (default) | Kubernetes Secrets
+
+| database | Encrypted in the IOMETE database
+
+| vault | HashiCorp Vault (requires endpoint, path, token)
+
+## Logging
+
+Depending on your observability stack, you can route logs to one of several backends:
+
+| Source | Description
+
+| kubernetes (default) | Reads logs directly from the Kubernetes API
+
+| loki | Grafana Loki (requires host, port)
+
+| elasticsearch | Elasticsearch (requires endpoint, apiKey, indexPattern)
+
+| splunk | Splunk Enterprise (requires endpoint, token, indexName)
+
+Hot storage: When hotStorage.enabled is true, the platform tries the Kubernetes API first (for recent logs), then falls back to the external backend for older entries.
+
+## Monitoring
+
+If you run Prometheus, set monitoring.enabled to true. This adds scrape annotations to every service pod. Metrics endpoints differ by framework:
+
+- /q/metrics for Quarkus services (Core, Cluster, Identity, SQL, Catalog, REST Catalog)
+- /metrics for everything else (Spark Operator, Collab)
+
+## TLS and TrustStore
+
+If your environment uses self-signed certificates, mount a Java TrustStore into all services via a Kubernetes Secret. The TrustStore must include both the default public certificates and your custom ones. See TrustStore Configuration for setup details.
+
+## Ingress
+
+The Gateway expects an ingress controller in front of it. When ingress.httpsEnabled is true (the default), the Gateway sets the public-facing protocol to HTTPS in forwarded headers. See Configure Ingress for setup instructions.
+
+## OpenAPI Documentation
+
+Every backend service publishes an OpenAPI spec, and the Gateway proxies them all under /openapi/:
+
+| Path | Service
+
+| /openapi/ui | Swagger UI (served by Core Service)
+
+| /openapi/core | Core Service
+
+| /openapi/cluster | Cluster Service
+
+| /openapi/iam | Identity Service
+
+| /openapi/sql | SQL Service
+
+| /openapi/catalog | Catalog Service
+
+| /openapi/rest-catalog | Iceberg REST Catalog
+
+## Cloud Provider Support
+
+IOMETE runs on AWS, Azure, GCP, and on-premises Kubernetes. The main differences between providers are scratch directory paths and zone-aware scheduling:
+
+| Provider | Scratch Directory | Zone-Aware Scheduling
+
+| On-Premises | /local1 | No
+
+| AWS | /local1 | Yes (region + availability zone)
+
+| Azure | /mnt | No
+
+| GCP | /mnt/stateful_partition | No
+
+Regardless of provider, Spark workload pods include tolerations for dedicated nodes (k8s.iomete.com/dedicated) and ARM64 architecture (kubernetes.io/arch=arm64).
+
+## Technology Stack
+
+| Component | Technology
+
+| Backend language | Kotlin
+
+| JVM | Java
+
+| Backend framework | Quarkus
+
+| Build system | Gradle (Kotlin DSL)
+
+| Frontend | React, TypeScript, Vite
+
+| UI library | Ant Design
+
+| Spark engine | Apache Spark
+
+| Table format | Apache Iceberg
+
+| Hive Metastore | Apache Hive
+
+| Spark Operator | Kubernetes Operator (Go)
+
+| Event ingestion | Rust
+
+| Job orchestration | Prefect (Python)
+
+| Messaging | NATS JetStream
+
+| Search | Typesense
+
+| Rate limiting | Redis
+
+Previous
+
+Install
+
+Next
+
+Storage Migration
+
+## ON THIS PAGE
+
+- Helm Chart Structure
+
+- Initialization Job
+- Configuration Distribution
+
+- Service Inventory
+- Gateway Routing
+
+- API Routes
+- Non-API Routes
+- Dynamic Workload Routes
+
+- Node Placement
+- Multi-Namespace Support
+- Priority Classes
+- Autoscaling
+- Feature Flags
+
+- Deployment Flags
+- Runtime Behavior Flags
+
+- Storage Configuration
+
+- Object Storage
+- Database
+
+- Secret Store
+- Logging
+- Monitoring
+- TLS and TrustStore
+- Ingress
+- OpenAPI Documentation
+- Cloud Provider Support
+- Technology Stack
